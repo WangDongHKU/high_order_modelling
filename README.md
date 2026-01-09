@@ -1,4 +1,4 @@
-# high_order_modelling
+# High_order_modelling
 Abstract: The dynamics of SARS-CoV-2 transmission highlight the need to integrate human higher-order collective behavioral, spatial, and viral evolutionary factors into epidemic modeling. To capture social reinforcement phenomena, embedded in human higher-order interaction and often overlooked by standard models, we introduce a higher-order simplicial framework that combines human mobility, genomic diversity, and antigenic drift to examine how higher-order  interactions and viral evolution shape transmission dynamics. During the pandemic, social reinforcement and cluster heterogeneity amplify infection risk, while higher-order interactions with multiple infectors increase transmissibility. Reconstructed networks reveal shifting critical locations, pathways, and evolving spatiotemporal cluster structures. Genetic diversity and antigenic drift correlate with increased susceptibility and transmissibility. These findings underscore the importance of data-driven approaches that account for higher-order interactions, human mobility and viral evolution, informing targeted interventions for SARS-CoV-2 and other respiratory pathogens. pathogens.
-
-Ref Higher-order interactions, human mobility and viral evolution shaped the SARS-CoV-2 transmission in Mainland China doi: https://doi.org/10.64898/2025.12.17.25342513
+# Ref
+Higher-order interactions, human mobility and viral evolution shaped the SARS-CoV-2 transmission in Mainland China  Doi: https://doi.org/10.64898/2025.12.17.25342513
