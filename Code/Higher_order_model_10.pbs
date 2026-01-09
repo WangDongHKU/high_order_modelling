@@ -14,4 +14,4 @@
 ##Verbose output
 #PBS -V 
 module load r/4.0.5
-Rscript /home/Dong/Higher_model_mainland/higher_010/Higer_order_model_103.R
+Rscript /home/Dong/Higher_model_mainland/higher_010/Higer_order_model_10.R
