@@ -1,0 +1,4081 @@
+---
+title: "higher_order_3_covid_VOC"
+author: "Dong"
+date: "2025-05-15"
+output: html_document
+---
+---
+title: "MultiStrainStan"
+author: "Edwin van Leeuwen"
+bibliography: assets/references.bib
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+---
+install.packages("tidyverse")\\
+install.packages("ggplot2",dependencies=TRUE)\\
+install.packages("ggpubr",dependencies=TRUE) install.packages("ggpubr",
+repos = "<https://cloud.r-project.org/>", dependencies = TRUE)\\
+install.packages("purrr",dependencies=TRUE)
+---
+
+```{r setup, include = F}
+setwd("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL")
+.libPaths("E:\\Dong\\R_library")
+install.packages("remotes")
+library(dplyr)
+library(rstan)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+library(tidyverse)
+library(quantreg)
+library(dplyr)
+library(ggpubr)
+library(R.matlab)
+library("bayesplot")
+library("igraph")
+library(gridExtra)
+library(cowplot)
+library(tidyr)
+knitr::opts_chunk$set(cache = T, echo = T, message = F, warning = F,include = T)
+theme_set(theme_bw())
+# Colourblind friendly colours
+options(max.print = 10000)
+
+```
+
+
+
+```{R}
+setwd("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL")
+# pred_cases_std <- tail(multistrain_fit$pred_cases[,seq(1:31),seq(1:165)], 1000)
+# # Reshape the data
+# data_frame_std <- reshape2::melt(sqrt(1+pred_cases_std))
+# colnames(data_frame_std) <- c("Iteration", "Variable", "Length", "Value")
+# # Calculate credible intervals
+# credible_intervals_std <- data_frame_std %>%
+#   group_by(Variable, Length) %>%
+#   summarize(
+#     lower = quantile(Value, 0.025),
+#     upper = quantile(Value, 0.975),
+#     lower1 = quantile(Value, 0.25),
+#     upper1 = quantile(Value, 0.75),
+#     mean = mean(Value)#quantile(Value, 0.5)
+#   ) %>%
+#   mutate(Variable = factor(Variable))
+# #save(credible_intervals_std, file = "credible_intervals_std.RData")
+# 
+# # Prepare ILI data
+# data_ILI <- sqrt(1+data_lst$cases) %>% tibble::as_data_frame() %>% mutate(week = row_number())
+# colnames(data_ILI) <- seq_len(ncol(data_ILI))
+# data_ILI$id <- seq_len(nrow(data_ILI))
+# data_ILI_long <- reshape2::melt(data_ILI, id.vars = "id")
+# colnames(data_ILI_long) <- c("Length", "Variable", "Value")
+# credible_intervals_std <- credible_intervals_std %>%
+#   left_join(data_ILI_long, by = c("Variable", "Length"))
+# 
+# save(credible_intervals_std, file = "credible_intervals_std.RData")
+
+Proportion <- c(0.2048,0.1936,0.1851,0.1908,0.196,0.1959,0.1908,0.1944,0.1945,0.1913,0.1947,0.1915,0.1905,0.193,0.1936,0.1942,0.1931,0.1937,0.1934,0.1915)
+Improvement <- c(0.036359986,0.030973398,0.026651755,0.02096184,0.027603123,0.034906913,0.024307301,0.021707139,0.034244273,0.028531714,0.022976287,0.02239273,0.030736545,
+0.021158756,0.033492203,0.025067913,0.027069072,0.011185523,0.019460167,0.026825371)
+
+library(ggplot2)
+library(ggpubr)  # 用于添加统计指标
+library(ggrepel)
+# 创建数据框
+# weighted_pred_cases <- log(apply(multistrain_fit$pred_cases[,seq(1:31),seq(1:165)],c(1,2),sum) * multistrain_fit$p[,seq(1:31)])
+# proportion_median <-  apply(weighted_pred_cases, c(2), function(x) quantile(x, probs = 0.5))
+# proprtion_median <- apply(tail(multistrain_fit$p[,seq(1:31)], 4000), c(2), median)
+# proprtion_mean <- apply(tail(multistrain_fit$p[,seq(1:31)], 4000), c(2), mean)
+# highmedianloglike <- apply(tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 8000), c(2), function(x) quantile(x, probs = 0.5))
+# save(proprtion_median,proprtion_mean,highmedianloglike,highmeanloglike, file = "high_loglike3.Rdata")
+
+province_names <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Tibet', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+load("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL/high_loglike3.Rdata")
+load("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL/std_loglike3.Rdata")
+# sorted_loglike1 <- apply(high_loglike, c(2,3), sort) 
+# sorted_loglike2 <- apply(std_loglike, c(2,3), sort) 
+# delta_loglike <- sorted_loglike1 - sorted_loglike2
+df1 <- data.frame(Province = province_names,Proportion = exp(proportion_median),Improvement = apply(delta_loglike, c(2), function(x) quantile(x, probs = 0.50)))
+#df1 <- data.frame(Province = province_names,Proportion = exp(proportion_median),Improvement = apply(delta_loglike, c(2), mean))
+
+
+p_final1_4 <- ggplot(df1, aes(x = Proportion, y = Improvement)) +
+  geom_text_repel(aes(label = Province), size = 3, color = "black")+
+  labs(x = "Cases contributed from higher-order transmission", y = "Improvement of loglike\n(\u0394 loglike)") +
+  theme_classic(base_size = 16) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.grid.minor = element_blank()
+  ) + scale_x_log10()+
+  geom_smooth(method = "lm", formula = y ~ x,
+              fill = "#fdae61", color = "#d7191c", se = TRUE) +
+  geom_point(color = "#2c7bb6", size = 3, alpha = 0.8) +
+  stat_cor(  # 添加Pearson相关系数和p值
+    method = "pearson",
+    label.x = 1.8, label.y = 0.025,  # 标签位置
+    size = 4.5, color = "black",
+    cor.coef.name = "r"
+  )+
+  theme(
+    axis.text  = element_text(color = "black", size = 16),
+    plot.margin = margin(20, 20, 30, 20)
+  )
+p_final1_4
+
+# First fit the linear model
+model <- lm(Improvement ~ log10(Proportion), data = df1)
+
+# Create prediction data frame
+pred_df <- data.frame(Proportion = seq(min(df1$Proportion), max(df1$Proportion), length.out = 100))
+pred <- predict(model, newdata = pred_df, interval = "prediction") # Note "prediction" instead of "confidence"
+
+# Combine with original data
+pred_df <- cbind(pred_df, pred)
+
+p_final1_4 <- ggplot(df1, aes(x = Proportion, y = Improvement)) +
+  # Prediction interval ribbon (wider than CI)
+  geom_ribbon(data = pred_df, 
+              aes(x = Proportion, y = fit, ymin = lwr, ymax = upr),
+              fill = "#fdae61", alpha = 0.4) +
+  # Regression line
+  geom_line(data = pred_df, 
+            aes(x = Proportion, y = fit),
+            color = "#d7191c", linewidth = 1) +
+  # Points and labels
+  geom_point(color = "#2c7bb6", size = 3, alpha = 0.8) +
+  geom_text_repel(aes(label = Province), size = 3, color = "black") +
+  
+  # Correlation coefficient
+  stat_cor(
+    method = "pearson",
+    label.x = 1.8, label.y = 0.025,
+    size = 4.5, color = "black",
+    cor.coef.name = "r"
+  ) +
+  
+  # Formatting
+  scale_x_log10() +
+  labs(x = "Cases contributed from higher-order transmission", 
+       y = "Improvement of loglike\n(Δ loglike)") +
+  theme_classic(base_size = 16) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(color = "black", size = 16),
+    plot.margin = margin(20, 20, 30, 20)
+  )
+
+p_final1_4
+
+library(ggplot2)
+library(ggrepel)
+library(ggpubr)
+
+# Fit model and generate prediction data
+model <- lm(Improvement ~ log10(Proportion), data = df1)
+pred_df <- data.frame(Proportion = seq(min(df1$Proportion), 
+                                     max(df1$Proportion), 
+                                     length.out = 100))
+
+# Get predictions for both intervals
+pred_df <- cbind(pred_df,
+                predict(model, newdata = pred_df, interval = "confidence"),
+                predict(model, newdata = pred_df, interval = "prediction")[,-1])
+colnames(pred_df) <- c("Proportion", "fit", "ci_lwr", "ci_upr", "pi_lwr", "pi_upr")
+
+# Create plot
+p_final1_4 <- ggplot(mapping = aes(x = Proportion)) +
+  # Prediction Interval (wider band)
+  geom_ribbon(
+    data = pred_df,
+    aes(ymin = pi_lwr, ymax = pi_upr, y = fit),  # Explicit y aesthetic
+    fill = "grey", 
+    alpha = 0.2
+  ) +
+  
+  # Confidence Interval (narrower band)
+  geom_ribbon(
+    data = pred_df,
+    aes(ymin = ci_lwr, ymax = ci_upr, y = fit),  # Explicit y aesthetic
+    fill = "#fdae61",
+    alpha = 0.4
+  ) +
+  
+  # Regression line
+  geom_line(
+    data = pred_df,
+    aes(y = fit),
+    color = "#d7191c", 
+    linewidth = 1
+  ) +
+  
+  # Original data points
+  geom_point(
+    data = df1,
+    aes(y = Improvement),
+    color = "#2c7bb6", 
+    size = 3, 
+    alpha = 0.8
+  ) +
+  
+  # Labels with repel
+  geom_text_repel(
+    data = df1,
+    aes(y = Improvement, label = Province),
+    size = 3, 
+    color = "black"
+  ) +
+  
+  # Correlation annotation
+  stat_cor(
+    data = df1,
+    aes(y = Improvement),
+    method = "pearson",
+    label.x = 1.8, 
+    label.y = 0.03,
+    size = 4.5, 
+    color = "black",
+    cor.coef.name = "r"
+  ) +
+  
+  # Formatting
+  scale_x_log10() +
+  labs(
+    x = "Cases contributed from higher-order transmission", 
+    y = "Improvement of loglike\n(Δ loglike)"
+  ) +
+  theme_classic(base_size = 16) +
+  theme(
+    axis.text = element_text(color = "black", size = 16),
+    plot.margin = margin(20, 20, 30, 20)
+  )
+
+p_final1_4
+
+# p_final4_1 <- ggplot(df1, aes(x = Proportion, y = Improvement)) +
+#   geom_point(color = "#2c7bb6", size = 3, alpha = 0.8) +  # 蓝色散点
+#   labs(x = "Affected cases (log)", y = "Improvement of loglike \n (\u0394 loglike)") +
+#   theme_classic(base_size = 12) +
+#   theme(
+#     plot.title = element_text(hjust = 0.5, face = "bold"),
+#     panel.grid.minor = element_blank()
+#   )+
+#   geom_smooth(method = "lm", formula = y ~ x,
+#                fill = "#fdae61", se = TRUE,linetype = 0) +  # 红色拟合线+橙色置信带
+#   geom_quantile(quantiles = 0.5,  color = "#d7191c",  size = 1)+
+#   # stat_cor(  # 添加Pearson相关系数和p值
+#   #   method = "pearson", 
+#   #   label.x = 0.215, label.y = 0.2,  # 标签位置
+#   #   size = 4.5, color = "black"
+#   # )+
+#   theme(
+#     axis.text  = element_text(color = "black",size = 14),
+#     axis.title = element_text(size = 18),
+#     strip.text.x = element_text(size = 18, margin = margin(1.5,0,1.5,0)),
+#     plot.margin = margin(30,20,30,20))
+# 
+# p_final4_1
+
+
+province_names <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Tibet', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+delta_stats <- data.frame(
+  Province = province_names,
+  Median = apply(delta_loglike, 2, median),
+  CI95_lower = apply(delta_loglike, 2, function(x) quantile(x, 0.25)),
+  CI95_upper = apply(delta_loglike, 2, function(x) quantile(x, 0.75))
+)
+
+# delta_stats_plot1 <- ggplot(delta_stats, aes(x = reorder(Province, Median), y = Median)) +
+#   geom_point(color = "#2c7bb6", size = 3) +
+#   geom_errorbar(aes(ymin = CI95_lower, ymax = CI95_upper), width = 0.2, color = "#d7191c") +
+#   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+#   coord_flip() +
+#   labs(
+#     x = "Provinces",
+#     y = "\u0394 LogLikelihood"
+#   ) +
+#   theme_classic(base_size = 14)
+# delta_stats_plot1
+# ggsave("delta_stats_plot1.pdf",delta_stats_plot1,width = 6,height = 10)
+
+
+
+
+
+
+# 
+# p_final4_2 <- ggplot(df2, aes(x = Proportion, y = Improvement)) +
+#   geom_point(color = "#2c7bb6", size = 3, alpha = 0.8) +  # 蓝色散点
+#   labs(x = "Affected proportion \n (p)", y = "Improvement of loglike \n (\u0394 loglike)") +
+#   theme_classic(base_size = 12) +
+#   theme(
+#     plot.title = element_text(hjust = 0.5, face = "bold"),
+#     panel.grid.minor = element_blank()
+#   )+
+#   geom_smooth(method = "lm", formula = y ~ x,
+#                fill = "#fdae61",color = "#d7191c", se = TRUE) +  # 红色拟合线+橙色置信带
+#   #geom_quantile(quantiles = 0.5,  color = "#d7191c",  size = 1)+
+#   # stat_cor(  # 添加Pearson相关系数和p值
+#   #   method = "pearson",
+#   #   label.x = 0.218, label.y = 0.2,  # 标签位置
+#   #   size = 4.5, color = "black"
+#   # )+
+#   theme(
+#     axis.text  = element_text(color = "black",size = 14),
+#     axis.title = element_text(size = 18),
+#     strip.text.x = element_text(size = 18, margin = margin(1.5,0,1.5,0)),
+#     plot.margin = margin(30,20,30,20))
+# 
+# p_final4_2
+
+```
+
+```{r fitting, dependson = c("load_data"), echo = F}
+setwd("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL")
+#load("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL/standard_model_1015.Rdata")
+#  multistrain_fit <- rstan::extract(stan_fit)
+rstan::check_divergences(stan_fit)
+#  nuts_fit_4_summary <- summary(stan_fit, pars = c("S0"))$summary
+# print(nuts_fit_4_summary,scientific=FALSE,digits=3)
+#save(list = ls(), file = "/home/Dong/Rstan_Globally/model_str_multi_Base/model_str_multi_Base_NB.Rdata")
+#library(sf)
+library(ggplot2)
+library(reshape2)
+library(ggh4x)
+pred_cases <- tail(multistrain_fit$pred_cases[,seq(1:31),seq(1:165)], 5000)
+# Reshape the data
+data_frame <- reshape2::melt(sqrt(1+pred_cases))
+colnames(data_frame) <- c("Iteration", "Variable", "Length", "Value")
+# Calculate credible intervals
+credible_intervals <- data_frame %>%
+  group_by(Variable, Length) %>%
+  summarize(
+    lower = quantile(Value, 0.025),
+    upper = quantile(Value, 0.975),
+    lower1 = quantile(Value, 0.25),
+    upper1 = quantile(Value, 0.75),
+    mean = mean(Value)
+  ) %>%
+  mutate(Variable = factor(Variable))
+
+# Prepare ILI data
+data_ILI <- sqrt(1+data_lst$cases) %>% tibble::as_data_frame() %>% mutate(week = row_number())
+colnames(data_ILI) <- seq_len(ncol(data_ILI))
+data_ILI$id <- seq_len(nrow(data_ILI))
+# data_ILI$Variable <- seq_len(nrow(data_ILI))
+
+data_ILI_long <- reshape2::melt(data_ILI, id.vars = "id")
+colnames(data_ILI_long) <- c("Length", "Variable", "Value")
+
+# Combine credible intervals and ILI data
+credible_intervals <- credible_intervals %>%
+  left_join(data_ILI_long, by = c("Variable", "Length"))
+
+custom_labeller <- function(variable, value) {
+  return(c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang'))
+}
+
+plot5 <- ggplot() +
+    geom_point(data = credible_intervals, aes(x = Length, y = Value, alpha = "Data", show.legend = "TRUE"), size = 0.5) + 
+    geom_ribbon(data = credible_intervals, aes(x = Length, ymin = lower, ymax = upper, fill = "95% PIs"), alpha = 0.2) +
+    geom_line(data = credible_intervals, aes(x = Length, y = mean, color = "Mean"),size = 0.65) +  # 共享 color 图例
+    theme_classic(base_size = 16) +
+    theme(
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_line(color = "black"),
+        axis.title.y = element_text(size = 12,angle = 90),
+        axis.title.x = element_text(size = 12),
+        axis.line = element_line(color = "black"),
+        legend.position = c(0.93, 0.09),
+        legend.spacing = unit(0.0, "cm"),  # 调整图例项之间的水平间距
+        legend.spacing.y = unit(-0.2, "cm"),
+        panel.spacing.x  = unit(0.2,"lines"),
+        panel.spacing.y  = unit(-0.2,"lines"),
+        )+ #scale_y_sqrt()+
+    facet_wrap(~ Variable, ncol = 8, scales = "free", labeller = custom_labeller,strip.position = "top") +
+    theme(
+       axis.title.x = element_text(size = 20),  
+    axis.title.y = element_text(size = 20),  
+        strip.clip = "off",
+        strip.text.x = element_text(
+            size = 16,
+            vjust = -5,  # ★ 核心参数：负值越大越靠近面板内部 ★
+            margin = margin(b = 12, unit = "pt"),  # 增加底部安全间距
+            hjust = 0.5  # 确保水平居中
+        ),
+        strip.placement = "inside",  # 强制标签嵌入绘图区
+        strip.background = element_blank()  # 透明背景避免遮挡
+    )+
+    labs(
+        x = "\n Time (weekly)",
+        y = expression(sqrt(Cases))
+    ) +
+    scale_x_continuous(breaks = c(1, 53.25, 105.5, 165.75), labels = c("2020", "2021", "2022", "2023")) +
+    scale_alpha_manual(
+        values = c("Data" = 255)
+    ) +  
+    scale_fill_manual(
+        values = c("95% PIs" = "#F8766D")
+    ) +
+    scale_color_manual(
+        values = c("Mean" = "#F8766D")
+    ) +
+    guides(
+        alpha = guide_legend(  title = NULL,
+            order = 1, theme = theme(legend.text = element_text(size = 11)),
+            override.aes = list(size = 2, shape = 16),
+            keyheight = unit(0.15, "cm"), 
+            title.position = "top"),
+        fill = guide_legend(   title = "Fitting based on \nhigher-order model",
+                               title.theme = element_text(size = 11), theme = theme(legend.text = element_text(size = 11)),order = 2),
+        color = guide_legend(title = NULL,  order = 3, theme = theme(legend.text = element_text(size = 11)),override.aes = list(size = 1),)
+    )
+
+plot5
+
+ggsave(filename = "plot5.pdf", plot = plot5, width =19, height = 11,bg = "transparent")
+
+
+library(cowplot)
+
+# Define the years to repeat
+years <- rep(c(2020, 2021, 2022, 2023), 8)  # Repeat twice (for 8 facets)
+
+# Calculate x-positions for labels (evenly spaced across 8 facets)
+label_x <- seq(0.04, 0.991, length.out = 32)  # Adjust as needed
+label_y <- c(seq(0.06, 0.06, length.out = 28),0.29,0.29,0.29,0.29)  # Adjust as needed
+# Add to existing ggdraw()
+plot5_with_years <- ggdraw(plot5) +
+  draw_plot_label(
+    label = years,
+    x = label_x,            # X-coordinates (0-1 scale)
+    y = label_y,               # Y-coordinate (near bottom)
+    hjust = 0.5,            # Center alignment
+    vjust = 1,              # Place above the coordinate
+    size = 12,              # Font size
+    fontface = "plain"      # Font style
+  )
+
+plot5_with_years
+
+
+
+# dev.off()
+# pp <- mcmc_hist(stan_fit, pars = "p",transfor)
+# ggsave(filename = "pp.pdf", plot = pp, width =10, height = 8)
+# psp <- mcmc_hist(stan_fit, pars  = "sp")
+# ggsave(filename = "psp.pdf", plot = psp, width =10, height = 8)
+# pv <- mcmc_hist(stan_fit, pars = "v")
+# ggsave(filename = "pv.pdf", plot = pv, width =10, height = 8)
+# library(gridExtra)
+# library(cowplot)
+# social_impact <- plot_grid(pp, psp,pv, ncol = 3)
+# ggsave(filename = "social_impact.pdf", plot = social_impact, width =10, height = 3)
+
+#
+# pnpi <- mcmc_areas(stan_fit, regex_pars = "npi",  prob = 0.8)
+# pAir <- mcmc_areas(stan_fit, regex_pars = "air",  prob = 0.8)
+# pTemp <- mcmc_areas(stan_fit, regex_pars = "temp",  prob = 0.8)
+# #
+# mcmc_trace(stan_fit,  pars = c("v"), n_warmup = 1000)
+# aligned_plots1 <- align_plots(pnpi, pAir,pTemp, align = "v", axis = "tblr")
+# plot_grid(pp, psp,pv, ncol = 3)
+# save(a_raw, file = "a_raw_hig.Rdata")
+# ptemp <- mcmc_hist(stan_fit, pars = "temp")
+# 
+# pnpi <- mcmc_hist(stan_fit, pars = "npi")
+# 
+# pair <- mcmc_hist(stan_fit, pars = "air")
+
+
+province_labels <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia',
+                     'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu',
+                     'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan',
+                     'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing',
+                     'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu',
+                     'Qinghai', 'Ningxia', 'Xinjiang')
+# dim(multistrain_fit$v)
+# Pp1 <- tail(multistrain_fit$p[,seq(1:31),1], 1000)
+# Pp2 <- tail(multistrain_fit$p[,seq(1:31),2], 1000)
+# Pp3 <- tail(multistrain_fit$p[,seq(1:31),3], 1000)
+# #Pp <- tail(multistrain_fit$p[,seq(1:31)], 2000)
+#  Sp1 <- tail(multistrain_fit$sp[,seq(1:31),1], 1000)
+# Sp2 <- tail(multistrain_fit$sp[,seq(1:31),2], 1000)
+# Sp3 <- tail(multistrain_fit$sp[,seq(1:31),3], 1000)
+# #Sp <- tail(multistrain_fit$sp[,seq(1:31)],2000)
+# 
+#  Vv1 <- tail(multistrain_fit$v[,seq(1:31),1], 1000)
+#  Vv2 <- tail(multistrain_fit$v[,seq(1:31),2], 1000)
+#  Vv3 <- tail(multistrain_fit$v[,seq(1:31),3], 1000)
+# 
+# #Vv <- tail(multistrain_fit$v[,seq(1:3)], 2000)
+# # save (Pp,file = "Pp.Rdata")
+# # save (Sp,file = "Sp.Rdata")
+# # save (Vv,file = "Vv.Rdata")
+# 
+# 
+# save (Pp1,file = "Pp1.Rdata")
+# save (Pp2,file = "Pp2.Rdata")
+# save (Pp3,file = "Pp3.Rdata")
+# save (Sp1,file = "Sp1.Rdata")
+# save (Sp2,file = "Sp2.Rdata")
+# save (Sp3,file = "Sp3.Rdata")
+# save (Vv1,file = "Vv1.Rdata")
+# save (Vv2,file = "Vv2.Rdata")
+# save (Vv3,file = "Vv3.Rdata")
+
+# 
+# datesdiv <- seq(ymd("2019-12-31"), ymd("2023-02-27"), by = "week")
+# # Create data frame
+# diversity_df <- data.frame(Date = dates, Diversity = diversity/max(diversity))
+# # Plot with trend line
+# diversity_df <- ggplot(diversity_df, aes(x = Date, y = Diversity)) +
+#     geom_line(color = "#4E79A7", linewidth = 1) +
+#     theme_classic(base_size = 16) +
+#     theme(axis.text.x = element_text(angle = 0, hjust = 1))
+
+```
+
+```{r,echo=FALSE}
+setwd("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL")
+province_labels <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+  library(igraph)
+  library(ggplot2)
+  library(ggraph)
+  library(maps)
+  library(dplyr)
+  library(sf)
+  library(reshape2)  
+  library(stringr)
+  library(leiden)
+  library(rnaturalearth)
+  library(rnaturalearthdata)
+  # 省份名称列表
+  #province <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Tibet', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+  province <-c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+  library(ggplot2)
+  library(sf)
+  library(dplyr)
+  china_province_map_data <- ne_states(country = "China", returnclass = "sf")
+  taiwan_map_data <- ne_countries(country = "taiwan")
+  common_columns <- intersect(colnames(china_province_map_data), colnames(taiwan_map_data))
+  china_province_map_data <- china_province_map_data[, common_columns]
+  taiwan_map_data <- taiwan_map_data[, common_columns]
+  china_map <- rbind(china_province_map_data, taiwan_map_data)
+  date_range <-  c("2021-01-01")
+library(ggplot2)
+Pp <- tail(multistrain_fit$p[,seq(1:31)], 2000)
+Sp <- tail(multistrain_fit$sp[,seq(1:31)],2000)
+Pp <- apply(Pp ,2, median, na.rm = TRUE) %>% as.data.frame() %>% t() %>% as.data.frame()
+
+colnames(Pp) <- province_labels
+Pp$Date <- date_range
+
+Pp_long <- melt(Pp, id.vars = "Date", variable.name = "province", value.name = "value")
+Pp_long <- Pp_long %>% mutate(group = date_range) %>%
+  group_by(province, group) %>%
+  ungroup() %>%
+  mutate(group = factor(group, levels = unique(group), labels = date_range))
+  data_list1 <- lapply(1:length(date_range), function(i) {
+  province_data <- data.frame(name = province, value = Pp_long %>% filter(group == date_range[i]) %>% pull(value))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Date = date_range[i])
+})
+data_list1 <- lapply(1:length(date_range), function(i) {
+  province_data <- data.frame(name = province, value = Pp_long %>% filter(group == date_range[i]) %>% pull(value))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Date = date_range[i])
+})
+data <- do.call(rbind, (data_list1))
+plotpp <- ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_gradient2(
+    low = "cyan4", mid = "#F7F7F7", high = "#F8766D",
+    midpoint = tail(multistrain_fit$p[,seq(1:31)],2000) %>% median(),
+    breaks = seq(tail(multistrain_fit$p[,seq(1:31)],2000) %>% min() %>% round(), tail(multistrain_fit$p[,seq(1:31)],2000) %>% max()%>% round(), by = 0.02),  # Custom break points
+    labels = seq(tail(multistrain_fit$p[,seq(1:31)],2000) %>% min()%>% round(), tail(multistrain_fit$p[,seq(1:31)],2000) %>% max()%>% round(), by = 0.02)   # Corresponding labels
+  ) +
+    facet_wrap(~ Date, ncol = 1, nrow = 1, scales = "fixed") +
+  labs(fill = "Affected\nproportion (p)") +
+  theme_void(base_size = 16) +
+  theme(
+    text = element_text(family = "Arial"),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 16),
+    strip.text = element_blank(),
+    # strip.background = element_rect(fill = "white", color = NA),
+    legend.position = c(0.95, 0.3),
+    legend.key.height = unit(6, "mm"),
+    legend.text.align = 0,
+    plot.margin = margin(0,0,0,-50)
+  )
+plotpp
+  
+###################################################################################################################################################  
+Sp <- apply(Sp ,2, median, na.rm = TRUE) %>% as.data.frame() %>% t() %>% as.data.frame()
+colnames(Sp) <- province_labels
+Sp$Date <- date_range
+
+Sp_long <- melt(Sp, id.vars = "Date", variable.name = "province", value.name = "value")
+Sp_long <- Sp_long %>% mutate(group = date_range) %>%
+  group_by(province, group) %>%
+  ungroup() %>%
+  mutate(group = factor(group, levels = unique(group), labels = date_range))
+  data_list1 <- lapply(1:length(date_range), function(i) {
+  province_data <- data.frame(name = province, value = Pp_long %>% filter(group == date_range[i]) %>% pull(value))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Date = date_range[i])
+})
+  
+  data_list2<- lapply(1:length(date_range), function(i) {
+  province_data <- data.frame(name = province, value = Sp_long %>% filter(group == date_range[i]) %>% pull(value))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Date = date_range[i])
+})
+  
+data <- do.call(rbind, (data_list2))
+plotsp <-ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_gradient2(
+    low = "#2166AC",  # Deep ocean blue
+    mid = "#F7F7F7",  # Pure white
+    high = "#B2182B",  # Fire engine red
+    midpoint = tail(multistrain_fit$sp[,seq(1:31)],2000) %>% median(),
+    breaks = seq(tail(multistrain_fit$sp[,seq(1:31)],2000) %>% min()%>% round(), tail(multistrain_fit$sp[,seq(1:31)],2000) %>% max()%>% round(), by = 0.1),  # Custom break points 
+    labels = seq(tail(multistrain_fit$sp[,seq(1:31)],2000) %>% min()%>% round(), tail(multistrain_fit$sp[,seq(1:31)],2000) %>% max()%>% round(), by = 0.1)   # Corresponding labels
+  ) +
+    facet_wrap(~ Date, ncol = 1, nrow = 1, scales = "fixed") +
+  labs(fill = "Susceptibility\nimpact (\u03D5)")+#+#expression("Susceptibility\nimpact ("*phi*")"))+#,+
+  theme_void(base_size = 16) +
+  theme(
+    text = element_text(family = "Arial"),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 16),
+    strip.text = element_blank(),
+    # strip.background = element_rect(fill = "white", color = NA),
+    legend.position = c(0.95, 0.3),
+    legend.key.height = unit(6, "mm"),
+    legend.text.align = 0,
+    plot.margin = margin(0,0,0,-50)
+  )
+plotsp
+#######################################################################
+Vv <- tail(multistrain_fit$v[,seq(1:3)],2000)
+# Combine them column-wise
+VV <- cbind(Vv)
+df <- data.frame(
+  group = factor(1:3),  # Create 3 categorical groups
+  y = apply(VV, 2, function(x)  quantile(x, 0.5)),     # Column means as central values
+  ymin = apply(VV, 2, function(x)  quantile(x, 0.25)),  # Lower: mean - 1SD
+  ymax = apply(VV, 2, function(x)  quantile(x, 0.75))  # Upper: mean + 1SD
+)
+#expression(alpha*","*beta*","*gamma*","*delta~"strains")
+plotvv <- ggplot(df, aes(x = group, y = y, ymin = ymin, ymax = ymax)) +
+  geom_pointrange(
+    size = 1.2,
+    color = c("#2E5C4D", "#8C4A4A", "#0767a9" ),  # 3 distinct colors,"#8C6BB1"
+    linewidth = 0.8
+  ) +
+  labs(x = "Periods (by dominant VOC)",  y = expression(atop("Transmissibility impacts " * (v[0]),"from higher-order contact"))) +
+  scale_x_discrete(labels = c("Ancestral","Alpha, Delta", "Omicron")) +
+  theme_classic(base_size = 16)+ 
+  theme(
+    axis.text  = element_text(color = "black",size = 12),
+    plot.margin = margin(30,20,30,20))
+
+Rates <- tail(multistrain_fit$rate,2000)
+NPI <- tail(multistrain_fit$npi,2000)
+Rates <- matrix(Rates, ncol = 1)
+NPI <- matrix(NPI, ncol = 1)
+NPI_impact <- cbind(NPI,Rates)
+df <- data.frame(
+  group = factor(1:2),  # Create 3 categorical groups
+  y = apply(NPI_impact, 2, function(x)  quantile(x, 0.5)),     # Column means as central values
+  ymin = apply(NPI_impact, 2, function(x)  quantile(x, 0.025)),  # Lower: mean - 1SD
+  ymax = apply(NPI_impact, 2, function(x)  quantile(x, 0.975))  # Upper: mean + 1SD
+)
+#expression(alpha*","*beta*","*gamma*","*delta~"strains")
+scaling_factor <- max(df$ymax[df$group == 1]) / max(df$ymax[df$group == 2])
+plotNPI_impact <- ggplot(df, aes(x = group)) +
+  # Primary axis (left) - Rates (group 1 only)
+  geom_pointrange(
+    data = subset(df, group == 1),
+    aes(y = y, ymin = ymin, ymax = ymax),
+    size = 1.2,
+    color = "#2E5C4D",
+    linewidth = 0.8
+  ) +
+  # Secondary axis (right) - NPI (group 2 only, scaled)
+  geom_pointrange(
+    data = subset(df, group == 2),
+    aes(y = y * scaling_factor, 
+        ymin = ymin * scaling_factor, 
+        ymax = ymax * scaling_factor),
+    size = 1.2,
+    color = "#8C4A4A",
+    linewidth = 0.8
+  ) +
+  scale_y_continuous(
+    name = "Transmissibility",
+    sec.axis = sec_axis(~ ./scaling_factor, name = "Ascertainment rate")
+  ) +
+  scale_x_discrete(
+    labels = c(
+      expression(atop(pi[1])),
+      expression(atop(pi[2]))
+    )
+  ) +
+  labs(x="NPI Impact") +
+  theme_classic(base_size = 16) +
+  theme(
+    axis.text = element_text(color = "black", size = 11),
+    axis.title.y.left = element_text(color = "#2E5C4D"),
+    axis.title.y.right = element_text(color = "#8C4A4A"),
+    axis.text.y.left = element_text(color = "#2E5C4D"),
+    axis.text.y.right = element_text(color = "#8C4A4A"),
+    plot.margin = margin(30, 20, 20, 20)
+  ) +
+  coord_cartesian(ylim = c(1.24, 1.4))
+plotNPI_impact
+g3 <- ggplotGrob(plotNPI_impact)
+
+
+p_drift <- tail(multistrain_fit$p_drift,2000)
+div_rate <- tail(multistrain_fit$div_rate,2000)
+p_drift <- matrix(p_drift, ncol = 1)
+div_rate <- matrix(div_rate, ncol = 1)
+Gene_impact <- cbind(div_rate,p_drift)
+dff <- data.frame(
+  group = factor(1:2),  # Create 3 categorical groups
+  y = apply(Gene_impact, 2, function(x)  quantile(x, 0.5)),     # Column means as central values
+  ymin = apply(Gene_impact, 2, function(x)  quantile(x, 0.025)),  # Lower: mean - 1SD
+  ymax = apply(Gene_impact, 2, function(x)  quantile(x, 0.975))  # Upper: mean + 1SD
+)
+#expression(alpha*","*beta*","*gamma*","*delta~"strains")
+scaling_factor <- max(dff$ymax[dff$group == 1]) / max(dff$ymax[dff$group == 2])
+
+plotGene_impact <- ggplot(dff, aes(x = group)) +
+  # Primary axis (left) - Rates (group 1 only)
+  geom_pointrange(
+    data = subset(dff, group == 1),
+    aes(y = y, ymin = ymin, ymax = ymax),
+    size = 1.2,
+    color = "#2E5C4D",
+    linewidth = 0.8
+  ) +
+  # Secondary axis (right) - NPI (group 2 only, scaled)
+  geom_pointrange(
+    data = subset(dff, group == 2),
+    aes(y = y * scaling_factor, 
+        ymin = ymin * scaling_factor, 
+        ymax = ymax * scaling_factor),
+    size = 1.2,
+    color = "#8C4A4A",
+    linewidth = 0.8
+  ) +
+scale_y_continuous(
+    name = "Transmissibility",
+    sec.axis = sec_axis(
+      trans = ~ ./scaling_factor, 
+      name = "Susceptibility",
+      breaks = c(0, 0.03, 0.06, 0.09) # 手动指定你希望在右侧Y轴显示的刻度值
+    )
+  ) +
+  scale_x_discrete(
+    labels = c(
+      expression(atop(alpha[1])),
+      expression(atop(alpha[2]))
+    )
+  ) +
+  labs(x="Genetic Impact" ) +
+  theme_classic(base_size = 16) +
+  theme(
+    axis.text = element_text(color = "black", size = 11),
+    axis.title.y.left = element_text(color = "#2E5C4D"),
+    axis.title.y.right = element_text(color = "#8C4A4A"),
+    axis.text.y.left = element_text(color = "#2E5C4D"),
+    axis.text.y.right = element_text(color = "#8C4A4A"),
+    plot.margin = margin(30, 20, 20, 20)
+  ) +
+  coord_cartesian(ylim = c(0, 2.15))  # Add 10% headroom
+
+plotGene_impact
+g2 <- ggplotGrob(plotGene_impact)
+
+
+
+# plot1social <- plot_grid(plotlist = list(plotpp,plotsp,plotvv,plotGene_impact,plotNPI_impact,p_final1_4),ncol = 3,labels = c("a","b","c","d","e","f"),label_size = 28,hjust = 0.01)
+library(cowplot)
+
+# Create top row (a + b)
+top_row <- plot_grid(
+  plotpp, plotsp,
+  ncol = 2,
+  labels = c("a", "b"),
+  label_size = 28,
+  hjust = 0.01,
+  rel_widths = c(1, 1)  # Equal width for a and b
+)
+
+# Create bottom row with adjusted widths
+# bottom_row <- plot_grid(
+#   plotvv + theme(plot.margin = margin(20, 10, 20, 10)), 
+#   plotGene_impact + theme(plot.margin = margin(20, 10, 20, 10)),
+#   plotNPI_impact + theme(plot.margin = margin(20, 10, 20, 10)),
+#   ncol = 3,
+#   labels = c("c", "d", "e"),
+#   label_size = 28,
+#   align = "h",  # Horizontal alignment only (preserves y-axis scales)
+#   axis = "t",   # Align top edges
+#   rel_widths = c(1.5, 1, 1)  # Adjust as needed
+# )
+g1 <- ggplotGrob(plotvv)
+# Combine manually
+labels <- list(
+  textGrob("c", x = 0.03, y = 0, gp = gpar(fontsize = 28,fontface="bold")),
+  textGrob("d", x = 0.0, y = 0, gp = gpar(fontsize = 28,fontface="bold")),
+  textGrob("e", x = 0.0, y = 0, gp = gpar(fontsize = 28,fontface="bold"))
+)
+
+# Combine everything
+bottom_row <- grid.arrange(
+  arrangeGrob(g1, top = labels[[1]]),
+  arrangeGrob(g2, top = labels[[2]]),
+  arrangeGrob(g3, top = labels[[3]]),
+  ncol = 3,
+  widths = c(1.5, 1, 1)
+)
+# Verify output
+bottom_row
+# Combine top and bottom (left side)
+left_side <- plot_grid(
+  top_row,
+  bottom_row,
+  ncol = 1,
+  rel_heights = c(1, 1)  # Equal height for top and bottom
+)
+
+# Final arrangement with f on the right
+final_plot <- plot_grid(
+  left_side,
+  p_final1_4,  # f
+  ncol = 2,
+  rel_widths = c(3, 1.5),  # Left side takes 75% width, f takes 25%
+  labels = c("", "f"),   # Only label f
+  label_size = 28,
+  hjust = 0.01
+)
+
+# Verify layout
+print(final_plot)
+#ggsave("final_arrangement.pdf", final_plot, width = 16, height = 12)
+
+
+# library(showtext)
+# # For Windows: Use actual system font paths
+# font_add("Arial", "arial.ttf")  
+# font_add("Times New Roman", "times.ttf")
+# showtext_auto(enable = TRUE)  # Critical for PDF output
+# 
+# ggsave("plot1social.pdf", plot1social, width = 16, height = 6.321)
+
+
+Figure_2<- plot_grid(plotlist = list(final_plot,plot5_with_years),rel_heights = c(0.67,1),ncol = 1,nrow = 2,labels = c(NA,"g"),label_size = 28,hjust = 0.01)
+
+ggsave("Figure 2.pdf", Figure_2, width = 14.46*1.5, height = 12.76*1.5)
+# Figure_2
+```
+
+
+
+
+```{R}
+
+
+library(tidyverse)
+library(rstan)
+
+# Convert Stan samples to a tidy data frame
+p_samples <- as.data.frame(multistrain_fit$p) %>% 
+  setNames(c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia', 
+             'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 
+             'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 
+             'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 
+             'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 
+             'Tibet', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')) %>%
+  pivot_longer(everything(), names_to = "Province", values_to = "p")
+
+
+sp_samples <- as.data.frame(multistrain_fit$sp) %>% 
+  setNames(c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia', 
+             'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 
+             'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 
+             'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 
+             'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 
+             'Tibet', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')) %>%
+  pivot_longer(everything(), names_to = "Province", values_to = "sp")
+
+
+v_samples <- as.data.frame(VV) %>% 
+    setNames(c("Ancestral","Alpha, Delta", "Omicron")) %>%
+  pivot_longer(everything(), names_to = "Periods", values_to = "v0")
+
+Gene_impact_samples <- as.data.frame(Gene_impact) %>% 
+    setNames(c("Susceptbility","Transmissionbility")) %>%
+  pivot_longer(everything(), names_to = "Impact", values_to = "Gene_impact")
+ggplot(Gene_impact_samples, aes(x = Impact, y = Gene_impact, fill = Impact)) +
+  geom_violin(alpha = 0.6, width = 0.8) +
+  geom_boxplot(width = 0.2, fill = "white", outlier.shape = NA) +
+  scale_fill_manual(values = c("#2ca02c", "#d62728")) +  # Green and red
+  labs(y = "Gene Impact Value", x = NULL,
+       title = "Genetic Impact Distributions") +
+  coord_flip() +  # Horizontal orientation
+  theme_classic(base_size = 16)
+# ggplot(Gene_impact_samples, aes(x = Gene_impact, fill = Impact)) +
+#   geom_histogram(bins = 30, alpha = 0.7, position = "identity") +
+#   facet_wrap(~Impact, ncol = 1, scales = "free_y") +
+#   scale_fill_manual(values = c("#9467bd", "#8c564b")) +  # Purple and brown
+#   labs(x = "Gene Impact Value", y = "Count") +
+#   theme_bw() +
+#   theme(legend.position = "none")
+
+
+# NPI_impact_samples <- as.data.frame(NPI_impact) %>% 
+#     setNames(c("Susceptbility","Transmissionbility")) %>%
+#   pivot_longer(everything(), names_to = "Impact", values_to = "NPI_impact")
+# 
+# 
+# ggplot(NPI_impact_samples, aes(x = NPI_impact, y = NPI_impact, fill = Impact)) +
+#   geom_violin(alpha = 0.6, width = 0.8) +
+#   geom_boxplot(width = 0.2, fill = "white", outlier.shape = NA) +
+#   scale_fill_manual(values = c("#2ca02c", "#d62728")) +  # Green and red
+#   labs(y = "NPI Impact Value", x = NULL,
+#        title = "NPI Impact Distributions") +
+#   coord_flip() +  # Horizontal orientation
+#   theme_classic(base_size = 16)
+
+
+
+library(showtext)
+#font_add("dejavu","C:\Windows\Fonts")
+showtext_auto()
+library(ggplot2)
+library(ggridges)
+library(cowplot)
+library(viridis)
+library(grid)
+# Custom color scales for each parameter
+fig_p <- ggplot(p_samples, aes(x = p, y = reorder(Province, p, median), fill = ..x..)) +
+  geom_density_ridges_gradient(
+    scale = 1.2, 
+    alpha = 0.7,
+    rel_min_height = 0.01,  # Prevents tails at boundaries
+    jittered_points = FALSE  # Optional: show actual data points
+    # quantile_lines = TRUE,    # Optional: show median lines
+    # quantiles = 0.5
+  ) +
+  scale_fill_viridis_c(name = "p", option = "plasma", limits = c(0, 0.55)) +
+  scale_x_continuous(limits = c(0, 0.55), expand = c(0, 0)) +  # Constrain x-axis
+  labs(x = "p", y = "Provinces") +
+  theme_ridges() + 
+  theme_classic(base_size = 16) +
+  theme(axis.title.y = element_text(size = 18)) +
+  coord_cartesian(xlim = c(0, 0.55))  # Use only ONE coord_cartesian
+
+
+
+fig_phi <- ggplot(sp_samples, aes(x = sp, y = reorder(Province, sp, median), fill = ..x..)) +
+  geom_density_ridges_gradient(scale = 1.2, alpha = 0.7) +
+  scale_fill_viridis_c(name = "\u03D5", option = "turbo") +  # Viridis palette
+  labs( x = "\u03D5", y = NULL) +
+  theme_ridges() + 
+  scale_x_continuous(limits = c(0.99, 8), expand = c(0.01, 0.005)) +  # Constrain x-axis
+  theme_classic(base_size = 16)+
+    theme(axis.title.y = element_text(size = 18))  # Correct way to set y-axis title size
+
+
+ggplot(sp_samples, aes(x = sp, y = reorder(Province, sp, median))) +
+    geom_density_ridges(
+        stat = "binline",
+        bins = 200,
+        scale = 1.2,
+        alpha = 0.7,
+        #fill = "#440154",  # Single fill color instead of gradient
+        color = "white",   # Outline color
+        panel_scaling = TRUE
+    ) + scale_fill_viridis_c(name = " ", option = "turbo") +  # Viridis palette
+    labs(
+        x = expression(phi),
+        y = NULL
+    ) +
+    theme_classic(base_size = 16) +
+    theme(
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 18)
+    )
+
+
+
+fig_v <- ggplot(v_samples, aes(x = v, y = reorder(Periods, v, median), fill = ..x..)) +
+  geom_density_ridges_gradient(scale = 1.2, alpha = 0.7) +
+  scale_fill_viridis_c(name = expression(paste(v[0], " and ", italic(w))), option = "dodge") +  # Magma palette
+  labs( x=expression(paste(v[0], " and ", italic(w))), y = "Periods") +
+  theme_ridges() + 
+  theme_classic(base_size = 16) +
+  theme(axis.title.y = element_text(size = 18),
+        plot.margin = unit(c(1,0.1,0.1,0.1),"cm"))  # Correct way to set y-axis title size
+
+combined_plot <- plot_grid(
+     fig_p + theme(text = element_text(family = "Arial")),
+     fig_phi + theme(text = element_text(family = "Arial")), 
+     ncol = 2,
+     align = "h",
+     rel_widths = c(1, 1, 1),  # Wider first column for province names
+     labels = "auto",              # AUTO in uppercase for bold labels
+     label_size = 18,
+     label_fontfamily = "Arial"
+ )
+
+
+# Save or display
+ggsave("Extended Data Fig 2.pdf", combined_plot, width = 11, height = 8.6)
+combined_plot
+
+
+
+```
+
+
+
+
+
+```{R}
+
+# Figure_2<- plot_grid(plotlist = list(plot1social,plot5),ncol = 1,rel_heights = c(0.3,1),labels = c(NA,"d"),label_size = 24,hjust = 0.01)
+# Figure_2
+# 
+# ggsave("Figure 2.pdf", Figure_2, width = 13.88*1.5, height = 12.60*1.5)
+# http://127.0.0.1:25175/graphics/plot_zoom_png?width=1388&height=1260
+# http://127.0.0.1:9309/graphics/plot_zoom_png?width=1447&height=1318  http://127.0.0.1:43049/graphics/plot_zoom_png?width=1446&height=1276
+
+```
+
+```{R,echo=FALSE}
+
+province_labels <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+library(reshape2)
+
+custom_labels <- function(x){
+  sapply(x,function(val){
+    switch(val,
+  "2021-01-01"="Ancestral strains",
+  "2022-01-01"= expression(alpha*","*beta*","*gamma),
+  "2023-01-01"="Omicron strains",val)
+
+  })
+}
+# 
+# custom_labels <- function(Date) {
+#   labels <- c("Ancestral strains", "Alpha Delta strains","Omicron strains")
+#   return(labels[match(Date,c("2021-01-01","2022-01-01","2023-01-01"))])
+# }
+# 
+# data <- do.call(rbind, (data_list1))
+# plotpp <- ggplot(data = data) +
+#   geom_sf(aes(fill = value)) +
+#   scale_fill_gradient2(
+#     low = "cyan4", mid = "#F7F7F7", high = "#F8766D",
+#     midpoint = 0.25
+#   ) +
+#     facet_wrap(~ Date, ncol = 3, nrow = 1, scales = "fixed",
+#                labeller = labeller(Date = c("2021-01-01"="Ancestral strains","2022-01-01"= "Alpha Delta strains","2023-01-01"="Omicron strains"))) +
+#   labs(fill = "Affected\nproportion") +
+#   theme_void() +
+#   theme(
+#     text = element_text(family = "Arial"),
+#     legend.title = element_text(size = 12, face = "bold"),
+#     legend.text = element_text(size = 12),
+#     strip.text.x = element_text(size = 14, margin = margin(2,0,2,0)),
+#     strip.background = element_rect(fill = "white", color = NA),
+#     legend.position = c(1, 0.3),
+#     legend.key.height = unit(4, "mm"),
+#     plot.margin = margin(10,20,10,20)
+#   )
+# plotpp
+# 
+# data <- do.call(rbind, (data_list2))
+# plotsp <-ggplot(data = data) +
+#   geom_sf(aes(fill = value)) +
+#   scale_fill_gradient2(
+#     low = "#2166AC",  # Deep ocean blue
+#     mid = "#F7F7F7",  # Pure white
+#     high = "#B2182B",  # Fire engine red
+#     midpoint = 1.45
+#   ) +
+#     facet_wrap(~ Date, ncol = 3, nrow = 1, scales = "fixed",
+#                labeller = labeller(Date = c("2021-01-01"="Ancestral strains","2022-01-01"= "\u03B1, \u03B2,\u03B3,\u03B4 strains","2023-01-01"="Omicron strains"))) +
+#   labs(fill = "Susceptibility\nimpact") +
+#   theme_void() +
+#   theme(
+#     text = element_text(family = "Arial"),
+#     legend.title = element_text(size = 12, face = "bold"),
+#     legend.text = element_text(size = 12),
+#     strip.text.x = element_text(size = 14, margin = margin(2,0,2,0)),
+#     strip.background = element_rect(fill = "white", color = NA),
+#     legend.position = c(1, 0.3),
+#     legend.key.height = unit(4, "mm"),
+#     plot.margin = margin(10,20,10,20)
+#   )
+# plotsp
+# 
+# data <- do.call(rbind, (data_list3))
+# plotvv <- ggplot(data = data) +
+#   geom_sf(aes(fill = value)) +
+#   scale_fill_gradient2(
+#     low = "#1B7837",  # Forest green
+#     mid = "white",   # Light butter
+#     high = "#762A83",  # Royal purple
+#     midpoint = 1.02
+#   ) +
+#     facet_wrap(~ Date, ncol = 3, nrow = 1, scales = "fixed",
+#                labeller = labeller(Date = c("2021-01-01"="Ancestral strains","2022-01-01"= "\u03B1, \u03B2,\u03B3,\u03B4 strains","2023-01-01"="Omicron strains"))) +
+#     labs(fill = "Transmissibility\nimpacy") +
+#   theme_void() +
+#   theme(
+#     text = element_text(family = "Arial"),
+#     legend.title = element_text(size = 12, face = "bold"),
+#     legend.text = element_text(size = 12),
+#     strip.text.x = element_text(size = 14, margin = margin(2,0,2,0)),
+#     strip.background = element_rect(fill = "white", color = NA),
+#     legend.position = c(1, 0.3),
+#     legend.key.height = unit(4, "mm"),
+#     plot.margin = margin(10,20,10,20)
+#   )
+# plotvv
+# 
+# 
+# 
+# plot_grid(plotlist = list(plotpp,plotsp,plotvv),ncol = 1,labels = c("a","b","c"),label_size = 28,label_fontfamily = "Times New Roman")
+# 
+# # Earth-Tones	'#4D9221'	'#F7F7F7'	'#C72A40'	Environmental science
+# # Corporate	'#2C728E'	'#FFFFFF' '#EF853A'	Business analytics
+# # Medical	'#8C510A'	'#F6E8C3'	'#01665E'	Health research
+
+```
+
+
+
+
+
+```{r ,echo=FALSE}
+# 加载必要的库
+library(ggplot2)
+library(reshape2)
+# 模拟数据
+set.seed(123)
+months <- c("a. Jan-Feb 2020","b. Mar-Apr 2020","c. May-Jun 2020","d. Jul-Aug 2020","e. Sep-Oct 2020","f. Nov-Dec 2020",
+            "g. Jan-Feb 2021","h. Mar-Apr 2021","i. May-Jun 2021","j. Jul-Aug 2021","k. Sep-Oct 2021","l. Nov-Dec 2021",
+            "m. Jan-Feb 2022","n. Mar-Apr 2022","o. May-Jun 2022","p. Jul-Aug 2022","q. Sep-Oct 2022","r. Nov-Dec 2022","s. Jan-Feb 2023")
+provincenames <- c(
+  'Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 
+  'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 
+  'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 
+  'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 
+  'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang'
+)
+
+# 创建多矩阵数据（每个时间段一个矩阵）
+data_list <- lapply(1:length(months), function(i) {
+  matrix(rpois(961, lambda = 10), nrow = 31, ncol = 31, 
+         dimnames = list(provincenames, provincenames)) %>%
+    melt(varnames = c("Origin", "Destination"), value.name = "Exports") %>%
+    transform(Month = months[i])
+})
+data <- do.call(rbind, data_list)
+
+# 绘制热力图
+ggplot(data, aes(x = Destination, y = Origin, fill = Exports)) +
+  geom_tile(color = "white") +
+  scale_fill_gradientn(colors = c("#619CFF", "white", "#F8766D"), trans = "sqrt") +#trans = "sqrt
+  facet_wrap(~ Month, ncol = 7, nrow = 3, scales = "fixed") +  # 共享x轴和y轴
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 8),
+    axis.text.y = element_text(size = 8),
+    strip.text = element_text(size = 10),
+    panel.grid = element_blank()
+  ) +
+  labs(
+    fill = "Exports",
+    x = "Destination Provinces",
+    y = "Origin Provinces"
+  )
+```
+
+
+```{R,data ploting}
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+library(cowplot)
+library(dplyr)
+library(lubridate)
+custom_labeller <- function(variable, value) {
+  return(c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang'))
+}
+province <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+
+province <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+
+labels <- c("a. Jan-Feb 2020","b. Mar-Apr 2020","c. May-Jun 2020","d. Jul-Aug 2020","e. Sep-Oct 2020","f. Nov-Dec 2020",
+            "g. Jan-Feb 2021","h. Mar-Apr 2021","i. May-Jun 2021","j. Jul-Aug 2021","k. Sep-Oct 2021","l. Nov-Dec 2021",
+            "m. Jan-Feb 2022","n. Mar-Apr 2022","o. May-Jun 2022","p. Jul-Aug 2022","q. Sep-Oct 2022","r. Nov-Dec 2022","s. Jan-Feb 2023")
+months <- c("a. Jan-Feb 2020","b. Mar-Apr 2020","c. May-Jun 2020","d. Jul-Aug 2020","e. Sep-Oct 2020","f. Nov-Dec 2020",
+            "g. Jan-Feb 2021","h. Mar-Apr 2021","i. May-Jun 2021","j. Jul-Aug 2021","k. Sep-Oct 2021","l. Nov-Dec 2021",
+            "m. Jan-Feb 2022","n. Mar-Apr 2022","o. May-Jun 2022","p. Jul-Aug 2022","q. Sep-Oct 2022","r. Nov-Dec 2022","s. Jan-Feb 2023")
+# Mean_Temp <- data_lst$Mean_Temp
+# Mean_Temp <- data.frame(Mean_Temp)
+start_date <- as.Date("2020-01-01");end_date <- as.Date(start_date + 1154);date_range <- seq(start_date, end_date, by = "day")
+# Mean_Temp$Date <- date_range
+# Mean_Temp_long <- melt(Mean_Temp, id.vars = "Date", variable.name = "province", value.name = "mean_temp")
+# Mean_Temp_plot <- ggplot(data = Mean_Temp_long, aes(x = Date, y = mean_temp, color = mean_temp)) +  # 将color映射到mean_temp
+#     scale_color_gradient2(low = "darkblue",mid ="lightblue", high = "#D95319",midpoint = 10) +  # 设置颜色渐变
+#     geom_point(size = 0.5) +  # 设置点的大小
+#     guides(
+#         color = guide_legend(title = "Mean Temperature", order = 1)
+#     ) +
+#     labs(x = "Date", y = "Mean temperature") +
+#     facet_wrap(~ province, ncol = 8, scales = "fixed", labeller = custom_labeller) +
+#     theme_bw() + 
+#     theme(legend.position = c(0.94, 0.11))  # 设置图例位置
+# Mean_Temp_plot
+# ggsave("Figure S4_Data_Mean_Temp_plot.pdf", Mean_Temp_plot, width = 20, height = 10)
+# source("plot_Temperature_map.r")
+# Mean_Temp_long <- Mean_Temp_long %>%
+#   mutate(days_numeric = as.numeric(difftime(Date, as.Date("2020-01-01"), units = "days")) + 1)
+# 
+# Mean_Temp_long1 <- Mean_Temp_long %>%
+#   mutate(group = floor_date(Date, "2 months")) %>%
+#   group_by(province, group) %>%
+#   summarise(mean_temp = mean(mean_temp, na.rm = TRUE)) %>%
+#   ungroup() %>%
+#   mutate(group = factor(group, levels = unique(group), labels = labels))
+# 
+# 
+# data_list <- lapply(1:length(months), function(i) {
+#   province_data <- data.frame(name = province,value =Mean_Temp_long1 %>% filter(group == labels[i]) %>% pull(mean_temp))
+#   china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+# })
+# data <- do.call(rbind, data_list)
+# 
+# 
+# plot_Mean_Temp2 <- ggplot(data = data) +
+#     geom_sf(aes(fill = value)) +
+#     scale_fill_gradient2(low = "#4A7056", mid = "white",high = "#976666",midpoint = 10) +
+#     theme_void() +
+#     facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+#     labs(fill = "Mean temperature")+
+#     theme(
+#       legend.title = element_text(size = 5),  # 调整图例标题字体大小
+#       legend.text = element_text(size = 5),   # 调整图例文本字体大小
+#       plot.title = element_text(size = 5),    # 调整标题字体大小
+#       legend.position = c(0.9, 0.15)
+#     )
+# plot_Mean_Temp2
+# ggsave("Figure S7_Data_plot_Mean_Temp_map.pdf", plot_Mean_Temp2, width = 14, height = 9)
+
+
+
+# plot_Mean_Temp <- list()
+# for (i in 1:19) {
+# plot_Mean_Temp[[i]] <- plot_Temperature_map(Mean_Temp_long1 %>% filter(group == labels[i]) %>% pull(mean_temp))}
+# 
+# plot_Mean_Temp2 <- plot_grid(plotlist = plot_Mean_Temp,labels = labels, ncol = 4)
+# ggsave("Figure S7_Data_plot_Mean_Temp_map.pdf", plot_Mean_Temp2, width = 14, height = 12)
+# 
+
+
+
+
+# AirQuality <- data_lst$AirQuality 
+# AirQuality <- data.frame(AirQuality)
+# start_date <- as.Date("2020-01-01");end_date <- as.Date(start_date + 1154);date_range <- seq(start_date, end_date, by = "day")
+# AirQuality$Date <- date_range
+# AirQuality_long <- melt(AirQuality, id.vars = "Date", variable.name = "province", value.name = "AirQuality")
+# AirQuality_plot <- ggplot(data = AirQuality_long, aes(x = Date, y = log(AirQuality),color = log(AirQuality))) +
+#     scale_color_gradientn(colors = c("#77AC30",  "white", "darkred")) +  # 设置多个颜色渐变点 c("#619CFF", "white", "#F8766D")
+#   geom_line() +
+#   guides( color = guide_legend(title = "Air Quality Index \n(log) ",order =1))+
+#   labs( x = "Date", y = "Air Quality Index (log)") +
+#   facet_wrap(~ province, ncol = 8, scales = "fixed", labeller = custom_labeller) +
+#   theme_bw()+
+#   theme(legend.position = c(0.94, 0.11))
+#   
+# AirQuality_plot
+# 
+# ggsave("Figure S5_Data_AirQualityIndexplot.pdf", AirQuality_plot, width = 20, height = 10)
+# 
+# 
+# 
+# AirQuality_long1 <- AirQuality_long %>%
+#   mutate(group = floor_date(Date, "2 months")) %>%
+#   group_by(province, group) %>%
+#   summarise(AirQuality = mean(AirQuality, na.rm = TRUE)) %>%
+#   ungroup() %>%
+#   mutate(group = factor(group, levels = unique(group), labels = labels))
+# 
+# 
+# data_list <- lapply(1:length(months), function(i) {
+#   province_data <- data.frame(name = province,value =AirQuality_long1 %>% filter(group == labels[i]) %>% pull(AirQuality))
+#   china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+# })
+# data <- do.call(rbind, data_list)
+# 
+# 
+# plot_Air2 <- ggplot(data = data) +
+#     geom_sf(aes(fill = value)) +
+#     scale_fill_gradient2(low = "#4A7056", mid = "white",high = "#976666",midpoint = 60) +
+#     theme_void() +
+#     facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+#     labs(fill = "Air Quality Index")+
+#     theme(
+#       legend.title = element_text(size = 5),  # 调整图例标题字体大小
+#       legend.text = element_text(size = 5),   # 调整图例文本字体大小
+#       plot.title = element_text(size = 5),    # 调整标题字体大小
+#       legend.position = c(0.9, 0.15)
+#     )
+# plot_Air2
+# ggsave("Figure S8_Data_plot_Air_map.pdf", plot_Air2, width = 14, height = 9)
+
+
+
+NPI <- data_lst$NPI1 %>% t()
+NPI <- data.frame(NPI)
+NPI$Date <- date_range
+NPI_long <- melt(NPI, id.vars = "Date", variable.name = "province", value.name = "NPI")
+NPI_plot <- ggplot(data = NPI_long, aes(x = Date, y = NPI, color = NPI)) +
+    scale_color_gradientn(colors = c("#77AC30", "#F0E442", "#D95319", "darkred")) +  # 设置多个颜色渐变点
+  guides(
+     color = guide_legend(title = "NPI",order =1))+
+  geom_line() +
+  labs( x = "Date", y = "NPI stringency index") +
+  facet_wrap(~ province, ncol = 8, scales = "fixed", labeller = custom_labeller) +
+  theme(legend.position = c(0.94, 0.11))
+  theme_bw()
+ggsave("Figure S3_Data_NPI_Index_plot.pdf", NPI_plot, width = 20, height = 10)
+
+
+
+NPI_long <- NPI_long %>%
+  mutate(days_numeric = as.numeric(difftime(Date, as.Date("2020-01-01"), units = "days")) + 1)
+
+NPI_long1 <- NPI_long %>%
+  mutate(group = floor_date(Date, "2 months")) %>%
+  group_by(province, group) %>%
+  summarise(NPI = mean(NPI, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(group = factor(group, levels = unique(group), labels = labels))
+
+
+data_list <- lapply(1:length(months), function(i) {
+  province_data <- data.frame(name = province,value =NPI_long1 %>% filter(group == labels[i]) %>% pull(NPI))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+})
+data <- do.call(rbind, data_list)
+
+
+plot_NPI2 <- ggplot(data = data) +
+    geom_sf(aes(fill = value)) +
+    scale_fill_gradient2(low = "#4A7056", mid = "white",high = "#976666",midpoint = 50) +
+    theme_void() +
+    facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+    labs(fill = "NPI stringency index")+
+    theme(
+      legend.title = element_text(size = 5),  # 调整图例标题字体大小
+      legend.text = element_text(size = 5),   # 调整图例文本字体大小
+      plot.title = element_text(size = 5),    # 调整标题字体大小
+      legend.position = c(0.9, 0.15)
+    )
+plot_NPI2
+ggsave("Figure S4_Data_plot_NPI_map.pdf", plot_NPI2,  width = 14, height = 9)
+
+
+# source("plot_NPI_map.r")
+# plot_NPI <- list()
+# # 计算每bi-monthly天的累计数据 
+# for (i in 1:19) {
+# plot_NPI[[i]] <- plot_NPI_map(NPI_long1 %>% filter(group == labels[i]) %>% pull(NPI))}
+# plot_NPI2 <- plot_grid(plotlist = plot_NPI, labels = labels,ncol = 4)
+# ggsave("Figure S6_Data_plot_NPI_map.pdf", plot_NPI2,  width = 14, height = 12)
+
+# cairo_pdf("Data_plot_NPI_map_copy.pdf", width = 14, height = 12)
+# plot_NPI2
+# dev.off()
+# library(svglite)
+# svglite("Data_plot_NPI_map_copy.svg", width = 14, height = 12)
+# plot_NPI2
+# dev.off()
+
+```
+
+
+
+
+```{R,data ploting}
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+library(cowplot)
+library(dplyr)
+library(lubridate)
+custom_labeller <- function(variable, value) {
+  return(c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang'))
+}
+province <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+
+labels <- c("Ancestral strains", "Alpha Delta strains","Omicron strains")
+months <- c("Ancestral strains", "Alpha Delta strains","Omicron strains")
+# Mean_Temp <- data_lst$Mean_Temp
+# Mean_Temp <- data.frame(Mean_Temp)
+start_date <- as.Date("2020-01-01");end_date <- as.Date(start_date + 1154);date_range <- seq(start_date, end_date, by = "day")
+
+
+NPI <- data_lst$NPI1 %>% t()
+NPI <- data.frame(NPI)
+NPI$Date <- date_range
+NPI_long <- melt(NPI, id.vars = "Date", variable.name = "province", value.name = "NPI")
+NPI_plot <- ggplot(data = NPI_long, aes(x = Date, y = NPI, color = NPI)) +
+    scale_color_gradientn(colors = c("#77AC30", "#F0E442", "#D95319", "darkred")) +  # 设置多个颜色渐变点
+  guides(
+     color = guide_legend(title = "NPI",order =1))+
+  geom_line() +
+  labs( x = "Date", y = "NPI stringency index") +
+  facet_wrap(~ province, ncol = 8, scales = "fixed", labeller = custom_labeller) +
+  theme(legend.position = c(0.94, 0.11))
+  theme_bw()
+# ggsave("Figure S3_Data_NPI_Index_plot_main.pdf", NPI_plot, width = 20, height = 10)
+
+
+
+# NPI_long <- NPI_long %>%
+#   mutate(days_numeric = as.numeric(difftime(Date, as.Date("2020-01-01"), units = "days")) + 1)
+# 
+# NPI_long1 <- NPI_long %>%
+#   mutate(group = floor_date(Date, "2 months")) %>%
+#   group_by(province, group) %>%
+#   summarise(NPI = mean(NPI, na.rm = TRUE)) %>%
+#   ungroup() %>%
+#   mutate(group = factor(group, levels = unique(group), labels = labels))
+# 
+# 
+# data_list <- lapply(1:length(months), function(i) {
+#   province_data <- data.frame(name = province,value =NPI_long1 %>% filter(group == labels[i]) %>% pull(NPI))
+#   china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+# })
+# data <- do.call(rbind, data_list)
+# 
+# 
+# plot_NPI2 <- ggplot(data = data) +
+#     geom_sf(aes(fill = value)) +
+#     scale_fill_gradient2(low = "#4A7056", mid = "white",high = "#976666",midpoint = 50) +
+#     theme_void() +
+#     facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+#     labs(fill = "NPI stringency index")+
+#     theme(
+#       legend.title = element_text(size = 5),  # 调整图例标题字体大小
+#       legend.text = element_text(size = 5),   # 调整图例文本字体大小
+#       plot.title = element_text(size = 5),    # 调整标题字体大小
+#       legend.position = c(0.9, 0.15)
+#     )
+# plot_NPI2
+# ggsave("Figure S4_Data_plot_NPI_map_main.pdf", plot_NPI2,  width = 14, height = 9)
+
+
+
+```
+
+
+```{R}
+C <- data_lst$C
+nl <- data_lst$nl
+N <- data_lst$N
+part <- data_lst$part
+Mobility <- array(0, dim = c(1155, 31, 31))
+  for (t in 1:1155) {
+    for (k in 1:31) {
+        for (j in part[k]:part[k+1]-1){
+            Mobility[t,k,nl[j]] = 3.09*C[j,t]/1;#N[nl[j]]
+        }
+    }
+  }
+I_states <- multistrain_fit$I[seq(6001,6400),,] # 31*1155
+E_states <- multistrain_fit$E[seq(6001,6400),,]
+thetap <- multistrain_fit$thetap[seq(6001,6400,1)] # size 300*31
+rate <- tail(multistrain_fit$rate,400) # size 300*1
+npi <- multistrain_fit$npi
+NPI <- data_lst$NPI1/100
+
+p_report <- array(0, dim = c(400, 31, 1155))
+for(province in 1:31) { 
+  for (nums in 1:400) {
+  for (day in 1:1155) {
+      p_report[nums,province,day] = thetap[nums]*(exp(rate[nums]*NPI[province,day]))}
+  }
+}
+# p_report1 <- apply(p_report,c(2,3),mean)
+move_infection  <- array(0, dim = c(31, 31,1155,400))
+# array(0, dim = c(500, 31, 1155))
+for (num in 1:400){
+for(country1 in 1:31) {
+  for(country2 in 1:31) {
+  for (day in 1:1155) {
+      move_infection[country2, country1, day,num] <- Mobility[day,country1,country2]*((1-p_report[num,country2,day])*I_states[num,country2,day]+E_states[num,country2,day])
+    }
+  }
+}
+}
+
+library(lubridate)
+start_date <- min(date_range)
+labelsmain = c("Ancestral strains", "\u03B1, \u03B2,\u03B3,\u03B4 strains", "Omicron strains")
+labelsmain = c("Ancestral strains", "Alpha, Delta strains", "Omicron strains")
+
+breaks <- start_date + months(c(0,14,24,38))
+date_groups <-cut(date_range,breaks=breaks,
+                  label = labelsmain,
+                  right = FALSE)
+
+num_groups <- length(unique(date_groups))
+move_infection <- apply(move_infection, c(1, 2, 3, 4), as.numeric)
+cumulative_move_infection <- array(0, dim = c(31, 31, num_groups, 400))
+
+cumuMobility <- array(0, dim = c(31, 31, num_groups))
+for (k in 1:num_groups) {
+  for (i in 1:31) {
+     for (j in 1:31) {
+          group_dates <- which(date_groups == unique(date_groups)[k])
+          cumuMobility[i,j,k] = sum(Mobility[group_dates,i,j])
+       for (num in 1:400){
+          cumulative_move_infection[i, j, k,num] <- sum(move_infection[i, j, group_dates,num], na.rm = TRUE) }
+   }
+}
+}
+
+
+# Define a function to compute quantile-based CI
+
+
+# Compute 95% CI using quantile()
+quantile(apply(cumulative_move_infection[17, , 1, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(apply(cumulative_move_infection[9, , 2, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+#quantile(apply(cumulative_move_infection[1, , 2, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(apply(cumulative_move_infection[19, , 3, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+
+quantile(apply(cumulative_move_infection[,16 , 1, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(apply(cumulative_move_infection[,18 , 1, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(apply(cumulative_move_infection[,19 , 1, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE)
+quantile(apply(cumulative_move_infection[,10 , 2, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+
+
+quantile(apply(cumulative_move_infection[,18 , 3, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(apply(cumulative_move_infection[,20 , 3, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+
+quantile(cumulative_move_infection[17, 16, 1,], probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(cumulative_move_infection[17, 18, 1,], probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(cumulative_move_infection[9, 10, 2,], probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(cumulative_move_infection[19, 14, 3,], probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(cumulative_move_infection[19, 18, 3,], probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+quantile(cumulative_move_infection[19, 20, 3,], probs = c(0.5,0.025,0.975), na.rm = TRUE) 
+
+
+
+
+# Compute 95% CI using quantile()
+quantile(apply(cumulative_move_infection[17, , 1, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[17, , 1]) * 10000
+quantile(apply(cumulative_move_infection[9, , 2, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[9, , 2]) * 10000
+quantile(apply(cumulative_move_infection[1, , 2, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[1, , 2]) * 10000
+quantile(apply(cumulative_move_infection[19, , 3, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[19, , 3]) * 10000
+
+quantile(apply(cumulative_move_infection[,16 , 1, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[, 16, 1]) * 10000
+quantile(apply(cumulative_move_infection[,18 , 1, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[, 18, 1]) * 10000
+quantile(apply(cumulative_move_infection[,19 , 1, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[, 19, 1]) * 10000
+quantile(apply(cumulative_move_infection[,10 , 2, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[, 10, 2]) * 10000
+
+
+quantile(apply(cumulative_move_infection[,18 , 3, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[, 18, 3]) * 10000
+quantile(apply(cumulative_move_infection[,20 , 3, ], 2, sum, na.rm = TRUE), probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[, 20, 3]) * 10000
+
+quantile(cumulative_move_infection[17, 16, 1,], probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[17, 16, 1]) * 10000
+quantile(cumulative_move_infection[17, 18, 1,], probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[17, 18, 1]) * 10000
+quantile(cumulative_move_infection[9, 10, 2,],  probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[9, 10, 2]) * 10000
+quantile(cumulative_move_infection[19, 14, 3,], probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[19, 14, 3]) * 10000
+quantile(cumulative_move_infection[19, 18, 3,], probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[19, 18, 3]) * 10000
+quantile(cumulative_move_infection[19, 20, 3,], probs = c(0.5,0.025,0.975), na.rm = TRUE) / sum(cumuMobility[19, 20, 3]) * 10000
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+```{R}
+C <- data_lst$C
+nl <- data_lst$nl
+N <- data_lst$N
+part <- data_lst$part
+Mobility <- array(0, dim = c(1155, 31, 31))
+  for (t in 1:1155) {
+    for (k in 1:31) {
+        for (j in part[k]:part[k+1]-1){
+            Mobility[t,k,nl[j]] = 3.09*C[j,t]/1;#N[nl[j]]
+        }
+    }
+  }
+I_states <- apply(multistrain_fit$I[seq(6001,6400),,], c(2,3), mean) # 31*1155
+E_states <- apply(multistrain_fit$E[seq(6001,6400),,], c(2,3), mean) 
+thetap <- multistrain_fit$thetap[seq(6001,6400,1)] # size 300*31
+rate <- tail(multistrain_fit$rate,1000) # size 300*1
+npi <- multistrain_fit$npi
+NPI <- data_lst$NPI1/100
+
+p_report <- array(0, dim = c(100, 31, 1155))
+for(province in 1:31) { 
+  for (nums in 1:100) {
+  for (day in 1:1155) {
+      p_report[nums,province,day] = thetap[nums]*(exp(rate[nums]*NPI[province,day]))}
+  }
+}
+p_report1 <- apply(p_report,c(2,3),mean)
+move_infection  <- array(0, dim = c(31, 31,1155))
+# array(0, dim = c(500, 31, 1155))
+for(country1 in 1:31) {
+  for(country2 in 1:31) {
+  for (day in 1:1155) {
+      move_infection[country2, country1, day] <- Mobility[day,country1,country2]*((1-p_report1[country2,day])*I_states[country2,day]+E_states[country2,day])
+    }
+  }
+}
+
+dailyincidence <- readMat("case/dailyincidence.mat")
+# 将数据转换为数据框
+# 创建时间序列
+provincenames <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+start_date <- as.Date("2020-01-01")
+end_date <- as.Date("2023-02-28")
+date_range <- seq(start_date, end_date, by = "day")
+dailyincidence <- as.data.frame(dailyincidence)
+colnames(dailyincidence) <- date_range
+rownames(dailyincidence) <- provincenames 
+# 将数据转换为数据框
+dailyincidence <- as.data.frame(dailyincidence)
+dailyincidence[2:nrow(dailyincidence), 2:ncol(dailyincidence)] <- lapply(dailyincidence[2:nrow(dailyincidence), 2:ncol(dailyincidence)], as.numeric)
+
+# # 填充新的数据结构
+# for (i in 1:num_provinces) {
+#   for (k in 1:num_groups) {
+#     group_dates <- which(date_groups == unique(date_groups)[k])
+#     data_lst_week[i, k] <- sum(dailyincidence[i, group_dates], na.rm = TRUE)
+#   }
+# }
+# 为新的数据添加时间标签
+
+```
+
+
+
+
+```{R, plot link centrality bimontyly heatmap}
+# date_groups <- floor_date(date_range, "2 months")
+# num_provinces <- nrow(dailyincidence)
+# num_groups <- length(unique(date_groups))
+# group_labels <- labels
+
+province_location <-  c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang') %>% as.data.frame()
+colnames(province_location) <- "Label"
+province_location$Lon <- c(116.4142,117.323,114.9042,112.2922,113.9448,122.6085,126.1923,127.7615,121.4491,119.455,120.0934,117.2264,117.9874,115.7221,118.1498,113.614,112.2707,	111.7088,113.4244,108.7881,109.7453,107.874,102.7103,106.8748,101.487,88.0924,108.8701,104.2861,95.9956,106.1575,85.2401)
+province_location$Lat <- 2+c(40.1824,39.3054,37.8957,37.5777,44.0935,41.2956,43.6661,47.862,31.202,32.9711,29.1832,31.8257,26.0789,27.614,36.3427,33.882,30.9756,27.6104,23.3417,23.8298,19.1959,30.0572,30.6171,26.8154,24.974,31.6927,35.1917,35.7518,35.7452,37.2692,41.1129)
+province_location$Id <- province_location$Label
+
+# Assuming province_location is your data frame or matrix
+# write.csv(province_location, "province_location_1.csv", row.names = FALSE)
+# movement <- tibble(
+#   Source = rep('Hubei', 30),
+#   Target = province_location[selected_elements,1],
+#   Weight = dates_20_cases[selected_elements, 2]
+# )
+# write.csv(movement, "movement_1.csv", row.names = FALSE)
+library(gridExtra)
+library(cowplot)
+library(igraph)
+library(ggplot2)
+library(ggraph)
+library(maps)
+library(dplyr)
+library(leiden)
+library(rnaturalearth)
+library(rnaturalearthdata)
+
+library(lubridate)
+library(dplyr)
+
+# 将日期分组
+# date_groups <- floor_date(date_range, "2 months")
+#  num_groups <- length(unique(date_groups))
+# move_infection <- apply(move_infection, c(1, 2, 3), as.numeric)
+# cumulative_move_infection <- array(0, dim = c(31, 31, num_groups))
+
+
+source("plot_network_eweight.R")
+source("plot_network_betweenness.R")
+source("plot_network_effedistance.R")
+
+
+
+```
+
+```{R, plot link centrality bimontyly heatmap}
+library(lubridate)
+start_date <- min(date_range)
+labelsmain = c("Ancestral strains", "\u03B1, \u03B2,\u03B3,\u03B4 strains", "Omicron strains")
+labelsmain = c("Ancestral strains", "Alpha, Delta strains", "Omicron strains")
+
+breaks <- start_date + months(c(0,14,24,38))
+date_groups <-cut(date_range,breaks=breaks,
+                  label = labelsmain,
+                  right = FALSE)
+
+num_groups <- length(unique(date_groups))
+move_infection <- apply(move_infection, c(1, 2, 3), as.numeric)
+cumulative_move_infection <- array(0, dim = c(31, 31, num_groups))
+data_lst_week <- array(0, dim = c(31,num_groups))
+
+cumuMobility <- array(0, dim = c(31, 31, num_groups))
+for (k in 1:num_groups) {
+  for (i in 1:31) {
+     for (j in 1:31) {
+          group_dates <- which(date_groups == unique(date_groups)[k])
+          cumuMobility[i,j,k] = sum(Mobility[group_dates,i,j])
+          group_dates <- which(date_groups == unique(date_groups)[k])
+          cumulative_move_infection[i, j, k] <- sum(move_infection[i, j, group_dates], na.rm = TRUE) }
+          # data_lst_week[i,k] <- sum(dailyincidence[i, group_dates], na.rm = TRUE)
+   }
+}
+
+# sum(cumulative_move_infection[17,, 1]) / sum(cumuMobility[17, , 1]) * 10000
+# sum(cumulative_move_infection[9, , 2]) / sum(cumuMobility[9, , 2]) * 10000
+# sum(cumulative_move_infection[1, , 2]) / sum(cumuMobility[1, , 2]) * 10000
+# sum(cumulative_move_infection[19, , 3]) / sum(cumuMobility[19, , 3]) * 10000
+# 
+# sum(cumulative_move_infection[,16 , 1]) / sum(cumuMobility[, 16, 3]) * 10000
+# sum(cumulative_move_infection[,18 , 1]) / sum(cumuMobility[, 18, 3]) * 10000
+# sum(cumulative_move_infection[,19 , 1]) / sum(cumuMobility[, 19, 3]) * 10000
+# sum(cumulative_move_infection[,10 , 2]) / sum(cumuMobility[, 10, 3]) * 10000
+# 
+# sum(cumulative_move_infection[,18 , 3]) / sum(cumuMobility[, 18, 3]) * 10000
+# sum(cumulative_move_infection[,20 , 3]) / sum(cumuMobility[, 20, 3]) * 10000
+# 
+# 
+# cumulative_move_infection[17, 16, 1] / cumuMobility[17, 16, 1] * 10000
+# cumulative_move_infection[17, 18, 1] / cumuMobility[17, 18, 1] * 10000
+# cumulative_move_infection[9, 10, 2]  / cumuMobility[9, 10, 2] * 10000
+# cumulative_move_infection[19, 14, 3] / cumuMobility[19, 14, 3] * 10000
+# cumulative_move_infection[19, 18, 3] / cumuMobility[19, 18, 3] * 10000
+# cumulative_move_infection[19, 20, 3] / cumuMobility[19, 20, 3] * 10000
+
+
+source("plot_network_eweight.R")
+source("plot_network_betweenness.R")
+source("plot_network_effedistance.R")
+plot_eweight1 <- list()
+plot_betweenness1 <- list()
+plot_effedistance1 <- list()
+g1 <- list()
+g2 <- list()
+
+for (i in 1:num_groups) {
+g1[[i]] <- graph_from_adjacency_matrix(matrix(cumulative_move_infection[,,i]%>% t(), nrow=31, byrow=TRUE), mode="directed", weighted=TRUE)
+# plot_eweight1[[i]] <- plot_network_eweight(g)
+g2[[i]] <- graph_from_adjacency_matrix(matrix(cumulative_move_infection[,,i], nrow=31, byrow=TRUE), mode="directed", weighted=TRUE)
+# plot_betweenness1[[i]] <- plot_network_betweenness(g)
+# plot_effedistance1[[i]] <- plot_network_effedistance(g)
+}
+
+
+data_list1 <- lapply(1:num_groups, function(i) {
+  province_data <-   matrix(edge.betweenness(g2[[i]],directed = FALSE,weights =1/(1+E(g2[[i]])$weight)),nrow = 31, ncol = 31,dimnames = list(provincenames, provincenames)) %>% 
+    melt(varnames = c("Origin", "Destination"),value.name = "Exports") %>% 
+    transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list1)
+data <- data %>%
+  mutate(Exports = cut(Exports, 
+                              breaks = c(0, 5, 10, 30, 50, 80, 100, Inf), 
+                              labels = c("0-5", "5-10", "10-30", "30-50", "50-80","80-100", ">100")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_betweenness2 <- ggplot(data, aes(x = Destination, y = Origin, fill = Exports)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("white", "#CDDDE5", "#7BABCA", "#2879B0", "#2E5C8C","#FFDDC1", "#CA0020"),
+                    na.value = "white") +
+  facet_wrap(~ Month, ncol = 4, nrow = 1, scales = "fixed") +# ,labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))
+  theme_bw() +
+  theme(
+    # 核心修改部分
+    legend.position = "right",  # 或使用数值坐标微调
+    legend.box.margin = margin(l = 0),  # 左侧留白
+    legend.justification = "left",  # 左对齐
+    plot.margin = margin(r = 0, t=-2, l = 1,unit = "cm"),  # 右侧扩展空间
+    axis.text.x = element_text(angle = 90, vjust=0.5,hjust = 1, size = 8),
+    strip.text = element_blank(),
+    axis.title.x = element_text(size = 18,  face = "bold"),
+    axis.title.y = element_text(size = 18,  face = "bold"),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    panel.grid = element_blank()
+  )+
+  labs(fill = "Betweenness\ncentrality", x = "Destination", y = "Origin")
+plot_betweenness2
+# ggsave("Figure S17_link_plot_betweenness_2_main.pdf", plot_betweenness2, width = 15, height = 4.43)
+
+
+
+
+data_list2 <- lapply(1:num_groups, function(i) {
+  province_data <-   matrix((E(g2[[i]])$weight),nrow = 31, ncol = 31,dimnames = list(provincenames, provincenames))%>% 
+    melt(varnames = c("Origin", "Destination"),value.name = "Exports") %>% 
+    transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list2)
+data <- data %>%
+  mutate(Exports = cut(Exports, 
+                              breaks = c(0, 2500, 10000,40000, 90000, 160000, 250000, Inf), 
+                              labels = c("0-2500", "2500-10000","10000-40000", "40000-90000", "90000-160000", "160000-250000",">250000")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_eweight2 <- ggplot(data, aes(x = Destination, y = Origin, fill = (Exports))) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("white", "#CDDDE5", "#7BABCA", "#2879B0", "#2E5C8C","#FFDDC1", "#CA0020"),
+                    na.value = "white") +
+  facet_wrap(~ Month, ncol = 4, nrow = 1, scales = "fixed") + # ,labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))
+  theme_bw() +
+  theme(
+    # 核心修改部分
+    legend.position = "right",  # 或使用数值坐标微调
+    legend.box.margin = margin(l = 0),  # 左侧留白
+    legend.justification = "left",  # 左对齐
+    plot.margin = margin(r = 0, b = -2, l = 1, unit = "cm"),  # 右侧扩展空间
+    
+    # 保留原有样式
+    axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1, size = 8),
+    axis.title.x = element_text(size = 1),
+    axis.title.y = element_text(size = 18,  face = "bold"),
+    strip.text = element_text(size = 15),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    panel.grid = element_blank()
+  ) +
+  labs(fill = "Weight\ncentrality", x = " ", y = "Origin")
+plot_eweight2
+
+Figure_4 <- plot_grid(
+    plotlist = list(plot_eweight2, plot_betweenness2),
+    cols = 1,
+    rows = 2,
+    align = "hv",
+    labels = c("a","b"),
+    label_size = 24
+  )
+Figure_4
+
+ggsave("Figure 4.pdf", Figure_4, width = 15.11, height = 9.90)
+
+```
+
+```{R, plot incidence data}
+# Create the plot
+source("plot_Incidence_map.")
+
+    # scale_fill_gradient2(low = "#4A7056", high = "#976666") +#,midpoint = 50mid = "white",
+
+#绘制每两个月的数据图表
+plot_incidence <- list()
+for (i in 1:19) {
+  plot_incidence[[i]] <- plot_Incidence_map(dailyincidence1long1 %>% filter(group == labels[i]) %>% pull(Incidence))
+}
+
+# 将所有子图组合成一个图表
+plot_plot_incidence2 <- plot_grid(plotlist = plot_incidence, labels = labels, ncol = 4)
+ggsave("Figure S2_Data_plot_incidence_map.pdf", plot_plot_incidence2, width = 14, height = 12)
+
+
+
+```
+
+```{R, plot node centrality bimontyly map}
+# source("plot_degree_centrality_map.R")
+# source("plot_eigenvector_centrality_map.R")
+# source("plot_page_rank_centrality_map.R")
+# source("plot_hub_score_centrality_map.R")
+# source("plot_betweenness_centrality_map.r")
+# source("plot_degree_centrality_map_in.R")
+# plot_degree_centrality_map_in(g)
+  library(igraph)
+  library(ggplot2)
+  library(ggraph)
+  library(maps)
+  library(dplyr)
+  library(sf)
+  library(stringr)
+  library(stringr)
+  library(leiden)
+  library(rnaturalearth)
+  library(rnaturalearthdata)
+  library(ggplot2)
+  library(sf)
+  library(dplyr)
+  # 读取中国省份的地理数据
+  # china_map <- st_read("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL/china/cn.shp")
+  # china_map <- china_map %>%
+  #   mutate(NAME = str_replace(name, " .*", ""))
+  province <-c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+  
+  china_province_map_data <- ne_states(country = "China", returnclass = "sf")
+  taiwan_map_data <- ne_countries(country = "taiwan")
+  common_columns <- intersect(colnames(china_province_map_data), colnames(taiwan_map_data))
+  china_province_map_data <- china_province_map_data[, common_columns]
+  taiwan_map_data <- taiwan_map_data[, common_columns]
+  china_map <- rbind(china_province_map_data, taiwan_map_data)
+options(warn = 0)
+for (i in 1:num_groups) {
+  g1[[i]] <- graph_from_adjacency_matrix(matrix(cumulative_move_infection[,,i]%>% t(), nrow=31, byrow=TRUE), mode="directed", weighted=TRUE)
+  # plot_eigenvector1[[i]] <- plot_eigenvector_centrality_map(g1[[i]]) # in 
+  # plot_pagerank1[[i]] <- plot_page_rank_centrality_map(g[[i]]) # in
+  g2[[i]] <- graph_from_adjacency_matrix(matrix(cumulative_move_infection[,,i] , nrow=31, byrow=TRUE), mode="directed", weighted=TRUE)
+  # plot_degree1[[i]] <- plot_degree_centrality_map(g2[[i]]) # out degree
+  # plot_hub_score1[[i]] <- plot_hub_score_centrality_map(g[[i]]) # out degree
+  # plot_betweenness1[[i]] <- plot_betweenness_centrality_map(g[[i]]) # path
+}
+# E(g1[[6]])$weight <- 0.99*E(g1[[i]])$weight +0.005*E(g1[[5]])$weight +0.005*E(g1[[7]])$weight 
+#############################################################################################################################################
+data_list <- lapply(1:num_groups, function(i) {
+  province_data <- data.frame(name = province,value =strength(g2[[i]], mode="in", weights=sqrt(E(g2[[i]])$weight)))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = labelsmain[i]) %>% transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list)
+data <- data %>% mutate(value = cut(value, breaks = c(0, 100, 500, 700, 1000, 2000, Inf), 
+                                    labels = c("0-100", "100-500", "500-700","700-1000","1000-2000", ">2000")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_degree2 <- ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_manual(values = c("gray95", "#CDDDE5", "#7BABCA", "#2879B0", "#2E5C8C", "#CA0020"),
+                    na.value = "white") +    theme_void() +
+  facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed",
+             labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))
+  ) +
+  labs(fill = expression(sqrt("Degree(out)")))+
+  theme(strip.background = element_rect(fill = "white", color = NA),
+    legend.title = element_text(size = 10),  # 调整图例标题字体大小
+    legend.text = element_text(size = 10),   # 调整图例文本字体大小
+    plot.title = element_text(size = 10),    # 调整标题字体大小
+    plot.margin = margin(r = 2, unit = "cm"),
+    legend.position = "right"
+  )
+plot_degree2
+ggsave("Figure S9_plot_degree2.pdf", plot_degree2, width = 8.97, height = 2.26)
+
+data_list <- lapply(1:num_groups, function(i) {
+  province_data <- data.frame(name = province,value =strength(g1[[i]], mode="in", weights=sqrt(E(g1[[i]])$weight)))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = labelsmain[i]) %>% transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list)
+data <- data %>% mutate(value = cut(value, breaks = c(0, 100, 500, 700, 900, 1500, 2000, Inf), 
+                                    labels = c("0-100", "100-500", "500-700","700-900",  "900-1500","1500-2000", ">2000")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_degree2in <- ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_manual(values = c("gray95", "#CDDDE5", "#7BABCA", "#2879B0", "#2E5C8C","#FFDDC1", "#CA0020"),
+                  na.value = "white") +    theme_void() +
+  facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed",
+             labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))) +
+  labs(fill = expression(sqrt("Degree(in)")))+
+  theme(
+    strip.text = element_blank(),
+    legend.title = element_text(size = 10),  # 调整图例标题字体大小
+    legend.text = element_text(size = 10),   # 调整图例文本字体大小
+    plot.title = element_text(size = 10),    # 调整标题字体大小
+    plot.margin = margin(r = 0, unit = "cm"),
+    legend.position = "right"
+  )
+plot_degree2in
+ggsave("Figure S13_plot_degree2_in.pdf", plot_degree2in, width = 8.97, height = 2.26)
+######################################################################################################################
+# eigenvalue 
+data_list <- lapply(1:num_groups, function(i) {
+  province_data <- data.frame(name = province,value =eigen_centrality(g1[[i]], weights = E(g1[[i]])$weight,directed = TRUE,scale = TRUE)$vector)
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = labelsmain[i]) %>% transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list)
+data <- data %>% mutate(value = cut(value, breaks = c(0,0.01,0.1,0.2,0.5,0.8,1), 
+                                    labels = c("0-0.01", "0.01-0.1","0.1-0.2", "0.2-0.5","0.5-0.8", "0.8-1")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_eigenvector2in <- ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_manual(values = c("gray90", "#CDDDE5", "#7BABCA", "#2879B0", "#2E5C8C", "#CA0020"),
+                    na.value = "white") +    theme_void() +
+  facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed",
+             labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))) +
+  labs(fill = "Eigenvector(in)")+
+  theme(strip.background = element_rect(fill = "white", color = NA),
+        strip.text = element_blank(),
+    legend.title = element_text(size = 10),  # 调整图例标题字体大小
+    legend.text = element_text(size = 10),   # 调整图例文本字体大小
+    plot.title = element_text(size = 10),    # 调整标题字体大小
+    plot.margin = margin(r = 2, unit = "cm"),
+    legend.position = "right"
+  )
+plot_eigenvector2in
+ggsave("Figure S14_plot_eigenvector2_in.pdf", plot_eigenvector2in, width = 8.97, height = 2.26)
+
+data_list <- lapply(1:num_groups, function(i) {
+  province_data <- data.frame(name = province,value =eigen_centrality(g2[[i]], weights = E(g2[[i]])$weight,directed = TRUE,scale = TRUE)$vector)
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = labelsmain[i]) %>% transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list)
+data <- data %>% mutate(value = cut(value, breaks = c(0,0.01,0.1,0.2,0.3,0.8,1), 
+                                    labels = c("0-0.01", "0.01-0.1","0.1-0.2", "0.2-0.3","0.3-0.8", "0.8-1")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_eigenvector2 <- ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_manual(values = c("gray90", "#CDDDE5", "#7BABCA", "#2879B0", "#2E5C8C", "#CA0020"),
+                    na.value = "white") +    theme_void() +
+  facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed",
+             labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))) +
+  labs(fill = "Eigenvector(out)")+
+  theme(strip.background = element_rect(fill = "white", color = NA),
+    legend.title = element_text(size = 10),  # 调整图例标题字体大小
+    legend.text = element_text(size = 10),   # 调整图例文本字体大小
+    plot.title = element_text(size = 10),    # 调整标题字体大小
+    plot.margin = margin(r = 2, unit = "cm"),
+    legend.position = "right"
+  )
+plot_eigenvector2
+ggsave("Figure S10_plot_eigenvector2.pdf", plot_eigenvector2, width = 8.97, height = 2.26)
+######################################################################################################################
+
+# hubscore
+data_list <- lapply(1:num_groups, function(i) {
+  province_data <- data.frame(name = province,value = sqrt(sqrt(hub_score(g1[[i]],weights = E(g1[[i]])$weight)$vector)))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = labelsmain[i]) %>% transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list)
+data <- data %>% mutate(value = cut(value, breaks = c(0,0.1,0.2,0.4,0.7,1), 
+                                    labels = c("0-0.1","0.1-0.2", "0.2-0.4","0.4-0.7", "0.7-1")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_hub_score2out <- ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_manual(values = c("gray95", "#CDDDE5", "#7BABCA", "#2879B0", "#CA0020"),
+                    na.value = "white") +    theme_void() +
+  facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed",
+             labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))) +
+  labs(fill = "Hub score(out)")+
+  theme(strip.text = element_blank(),
+    legend.title = element_text(size = 10),  # 调整图例标题字体大小
+    legend.text = element_text(size = 10),   # 调整图例文本字体大小
+    plot.title = element_text(size = 10),    # 调整标题字体大小
+    plot.margin = margin(r = 2, unit = "cm"),
+    legend.position = "right"
+  )
+plot_hub_score2out
+ggsave("Figure S15_plot_hub_score2_out.pdf", plot_hub_score2out, width = 8.97, height = 2.26)
+
+data_list <- lapply(1:num_groups, function(i) {
+  province_data <- data.frame(name = province,value =hub_score(g2[[i]],weights = E(g2[[i]])$weight)$vector)
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = labelsmain[i]) %>% transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list)
+data <- data %>% mutate(value = cut(value, breaks = c(0,0.1,0.2,0.4,0.7,1), 
+                                    labels = c("0-0.1","0.1-0.2", "0.2-0.4","0.4-0.7","0.7-1")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_hub_score2in <- ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_manual(values = c("gray95", "#CDDDE5", "#7BABCA", "#2879B0", "#CA0020"),
+                    na.value = "white") +    theme_void() +
+  facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed",
+             labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))) +
+  labs(fill = "Hub score(in)")+
+  theme(strip.text = element_blank(),
+    legend.title = element_text(size = 10),  # 调整图例标题字体大小
+    legend.text = element_text(size = 10),   # 调整图例文本字体大小
+    plot.title = element_text(size = 10),    # 调整标题字体大小
+    plot.margin = margin(r = 2, unit = "cm"),
+    legend.position = "right"
+  )
+plot_hub_score2in
+ggsave("Figure S11_plot_hub_score2.pdf", plot_hub_score2in, width = 8.97, height = 2.26)
+######################################################################################################################
+# page rank
+data_list <- lapply(1:num_groups, function(i) {
+  pagerank_vector=page_rank(g1[[i]],algo = c("prpack", "arpack"),vids = V(g1[[i]]),directed = TRUE,weights =E(g1[[i]])$weight)$vector
+  province_data <- data.frame(name = province,value=scale(pagerank_vector, center = min(pagerank_vector), scale = max(pagerank_vector) - min(pagerank_vector)))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = labelsmain[i]) %>% transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list)
+data <- data %>% mutate(value = cut(value, breaks = c(0,0.1,0.2,0.5,0.8,1), 
+                                    labels = c("0-0.1","0.1-0.2", "0.2-0.5","0.5-0.8","0.8-1")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_pagerank2in <- ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_manual(values = c("gray95", "#CDDDE5", "#7BABCA",  "#2879B0", "#CA0020"),
+                    na.value = "white") +    theme_void() +
+  facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed",
+             labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))) +
+  labs(fill = "Page rank(in)")+
+  theme(strip.background = element_rect(fill = "white", color = NA),
+        strip.text = element_blank(),
+    legend.title = element_text(size = 10),  # 调整图例标题字体大小
+    legend.text = element_text(size = 10),   # 调整图例文本字体大小
+    plot.title = element_text(size = 10),    # 调整标题字体大小
+    plot.margin = margin(r = 2, unit = "cm"),
+    legend.position = "right"
+  )
+plot_pagerank2in
+ggsave("Figure S16_plot_pagerank2_in.pdf", plot_pagerank2in, width = 8.97, height = 2.26)
+
+data_list <- lapply(1:num_groups, function(i) {
+  pagerank_vector=page_rank(g2[[i]],algo = c("prpack", "arpack"),vids = V(g2[[i]]),directed = TRUE,weights =E(g2[[i]])$weight)$vector
+  province_data <- data.frame(name = province,value=scale(pagerank_vector, center = min(pagerank_vector), scale = max(pagerank_vector) - min(pagerank_vector)))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = labelsmain[i]) %>% transform(Month = labelsmain[i])
+})
+data <- do.call(rbind, data_list)
+data <- data %>% mutate(value = cut(value, breaks = c(0,0.1,0.2,0.5,0.8,1), 
+                                    labels = c("0-0.1","0.1-0.2", "0.2-0.5","0.5-0.8","0.8-1")))
+data$Month <- factor(data$Month, levels = labelsmain)
+plot_pagerank2 <- ggplot(data = data) +
+  geom_sf(aes(fill = value)) +
+  scale_fill_manual(values = c("gray95", "#CDDDE5", "#7BABCA",  "#2879B0", "#CA0020"),
+                    na.value = "white") +    theme_void() +
+  facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed",
+             labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))) +
+  labs(fill = "Page rank(out)")+
+  theme(strip.background = element_rect(fill = "white", color = NA),
+    legend.title = element_text(size = 10),  # 调整图例标题字体大小
+    legend.text = element_text(size = 10),   # 调整图例文本字体大小
+    plot.title = element_text(size = 10),    # 调整标题字体大小
+    plot.margin = margin(r = 2, unit = "cm"),
+    legend.position = "right"
+  )
+plot_pagerank2
+ggsave("Figure S12_plot_pagerank2.pdf", plot_pagerank2, width = 8.97, height = 2.26)
+
+
+plot_degree <- plot_grid(
+    plotlist = list(plot_degree2, plot_degree2in),
+    cols = 1,
+    rows = 2,
+    align = "hv",
+    label_size = 18,
+    labels = c("a","b")
+  )
+
+ggsave("plot_degree.pdf", plot_degree, width = 12.65, height = 6.18)
+
+plot_eigenvector <- plot_grid(
+    plotlist = list(plot_eigenvector2, plot_eigenvector2in),
+    cols = 1,
+    rows = 2,
+    align = "hv",
+    label_size = 18,
+    labels = c("a","b")
+  )
+ggsave("plot_eigenvector.pdf", plot_eigenvector, width = 12.65, height = 6.18)
+
+plot_pagerank <- plot_grid(
+    plotlist = list(plot_pagerank2, plot_pagerank2in),
+    cols = 1,
+    rows = 2,
+    align = "hv",
+    label_size = 18,
+    labels = c("a","b")
+  )
+
+ggsave("plot_pagerank.pdf", plot_pagerank, width = 12.65, height = 6.18)
+
+plot_hub_score <- plot_grid(
+    plotlist = list(plot_hub_score2out, plot_hub_score2in),
+    cols = 1,
+    rows = 2,
+    align = "hv",
+    labels = c("a","b"),
+    label_size = 18
+  )
+ggsave("plot_hub_score.pdf", plot_hub_score, width = 12.65, height = 6.18)
+
+plot_degree
+plot_eigenvector
+plot_pagerank
+plot_hub_score
+
+```
+
+
+
+```{R, time varying centrality 1155}
+source("Node_Degree_centrality_plot.r")
+source("Node_Eigenvector_centrality_plot.r")
+source("Node_hub_score_centrality_plot.r")
+source("Node_betweenness_centrality_plot.r")
+source("Node_pagerank_centrality_plot.r")
+labels_y <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+move_infection <- move_infection
+start_date <- as.Date("2020-01-01");end_date <- as.Date(start_date + 1154);date_range <- seq(start_date, end_date, by = "day")
+g <- graph_from_adjacency_matrix(matrix(move_infection[,,40] %>% t(), nrow=31, byrow=TRUE), mode = "directed",weighted = TRUE)
+# Monthly
+degree_centrality <- array(0, dim = c(1155))
+degree_centrality_all<- array(0, dim = c(31,1155))
+
+betweenness_centrality <- array(0, dim = c(1155))
+betweenness_centrality_all<- array(0, dim = c(31,1155))
+
+eigenvector_centrality <- array(0, dim = c(1155))
+eigenvector_centrality_all<- array(0, dim = c(31,1155))
+
+pagerank <- array(0, dim = c(1155))
+pagerank_all<- array(0, dim = c(31,1155))
+
+hub_score_centrality <- array(0, dim = c(1155))
+hub_score_centrality_all<- array(0, dim = c(31,1155))
+
+for (t1 in (1:1155)){
+    g <- graph_from_adjacency_matrix(matrix(move_infection[,,t1], nrow=31, byrow=TRUE), mode = "directed",weighted = TRUE)
+    eigenvector_centrality[t1] <- eigen_centrality(g,directed = TRUE,weights =E(g)$weight)$vector%>% which.max()
+    eigenvector_centrality_all[,t1] <- (eigen_centrality(g,directed = TRUE,weights =E(g)$weight)$vector)    
+    pagerank[t1] <- page_rank(g,directed = TRUE,weights =E(g)$weight)$vector%>% which.max()
+    pagerank_all[,t1] <- page_rank(g,directed = TRUE,weights =E(g)$weight)$vector
+    g <- graph_from_adjacency_matrix(matrix(move_infection[,,t1] %>% t(), nrow=31, byrow=TRUE), mode = "directed",weighted = TRUE)
+    degree_centrality[t1] <-  strength(g,weights =E(g)$weight,mode = c("out"))%>% which.max()
+    degree_centrality_all[,t1] <-  strength(g,weights =E(g)$weight,mode = c("out")) 
+    betweenness_centrality[t1] <- betweenness(g,directed = TRUE,weights =1/E(g)$weight)%>% which.max()
+    betweenness_centrality_all[,t1] <- betweenness(g,directed = TRUE,weights =1/E(g)$weight)
+    hub_score_centrality[t1] <- hub_score(g,weights =E(g)$weight)$vector %>% which.max()
+    hub_score_centrality_all[,t1] <- hub_score(g,weights =E(g)$weight)$vector
+}
+
+p_degree <- Node_Degree_centrality_plot(degree_centrality_all, labels_y, 3, "Degree(out)")+theme(plot.margin = unit(c(0.0, 0.0, 0.0, 1), "cm"))
+p_eigen <- Node_Eigenvector_centrality_plot(eigenvector_centrality_all, labels_y, 3,"Eigenvector(out)")+theme(plot.margin = unit(c(0.0, 0.0, 0.0, 1), "cm"))
+p_betweenness <- Node_betweenness_centrality_plot(betweenness_centrality_all, labels_y, 3)+theme(plot.margin = unit(c(0.0, 0.0, 0.0, 1), "cm"))
+p_pagerank <- Node_pagerank_centrality_plot(pagerank_all, labels_y, 3,"Page rank(out)")+theme(plot.margin = unit(c(0.0, 0.0, 0.0, 1), "cm"))
+p_hub_score <- Node_hub_score_centrality_plot(hub_score_centrality_all, labels_y, 3,"Hub score(out)")+theme(plot.margin = unit(c(0.0, 0.0, 0.0, 1), "cm"))
+
+#aligned_plots <- align_plots(p_degree,p_hub_score, p_eigen,p_pagerank, align = "v", axis = "tblr")
+# 绘制对齐后的图形
+# aligned_plots_COMPLINE <- plot_grid(aligned_plots[[1]], aligned_plots[[2]], aligned_plots[[3]], aligned_plots[[4]], ncol = 2,labels="auto",align = "h",  # 水平对齐
+#   axis = "tb",  # 对齐顶部和底部
+#   rel_widths = c(1, 1),  # 保持相同的宽度
+#   hjust = -2.5  # 调整水平间距
+#   )
+aligned_plots_COMPLINE <- plot_grid(p_degree, p_hub_score, p_eigen, p_pagerank, ncol = 2,labels="auto",align = "h",  # 水平对齐
+  axis = "tb",  # 对齐顶部和底部
+  rel_widths = c(1, 1),  # 保持相同的宽度
+  hjust = -2.5  # 调整水平间距
+  )
+ggsave("Node_centrality_time_varying.pdf", aligned_plots_COMPLINE, width = 14, height = 7)
+
+#################################################################################################################
+
+for (t1 in (1:1155)){
+    g <- graph_from_adjacency_matrix(matrix(move_infection[,,t1]%>% t(), nrow=31, byrow=TRUE), mode = "directed",weighted = TRUE)
+    eigenvector_centrality[t1] <- eigen_centrality(g,directed = TRUE,weights =E(g)$weight)$vector%>% which.max()
+    eigenvector_centrality_all[,t1] <- (eigen_centrality(g,directed = TRUE,weights =E(g)$weight)$vector)    
+    pagerank[t1] <- page_rank(g,directed = TRUE,weights =E(g)$weight)$vector%>% which.max()
+    pagerank_all[,t1] <- page_rank(g,directed = TRUE,weights =E(g)$weight)$vector
+    degree_centrality[t1] <-  strength(g,weights =E(g)$weight,mode = c("in"))%>% which.max()
+    degree_centrality_all[,t1] <-  strength(g,weights =E(g)$weight,mode = c("in"))    
+    g <- graph_from_adjacency_matrix(matrix(move_infection[,,t1] , nrow=31, byrow=TRUE), mode = "directed",weighted = TRUE)
+    betweenness_centrality[t1] <- betweenness(g,directed = TRUE,weights =1/E(g)$weight)%>% which.max()
+    betweenness_centrality_all[,t1] <- betweenness(g,directed = TRUE,weights =1/E(g)$weight)
+    hub_score_centrality[t1] <- hub_score(g,weights =E(g)$weight)$vector %>% which.max()
+    hub_score_centrality_all[,t1] <- hub_score(g,weights =E(g)$weight)$vector
+}
+source("Node_Degree_centrality_plotin.r")
+p_degreein <- Node_Degree_centrality_plotin(degree_centrality_all, labels_y, 3," Degree(in)")+theme(plot.margin = unit(c(0.0, 1, 0.0, 0.0), "cm"), axis.title.y = element_blank(),axis.text.y = element_blank()) + labs(y = NULL) 
+p_eigenin <- Node_Eigenvector_centrality_plot(eigenvector_centrality_all, labels_y, 3,"Eigenvector(in)")+theme(plot.margin = unit(c(0.0, 1, 0.0, 0.0), "cm"),axis.title.y = element_blank(),axis.text.y = element_blank())+labs(y = NULL) 
+p_betweennessin <- Node_betweenness_centrality_plot(betweenness_centrality_all, labels_y, 3)+theme(plot.margin = unit(c(0.0, 1, 0.0, 0.0), "cm"),axis.title.y = element_blank(),axis.text.y = element_blank())+labs(y = NULL) 
+p_pagerankin <- Node_pagerank_centrality_plot(pagerank_all, labels_y, 3,"Page rank(in)")+theme(plot.margin = unit(c(0.0, 1, 0.0, 0.0), "cm"),axis.title.y = element_blank(), axis.text.y = element_blank())+labs(y = NULL) 
+p_hub_scorein <- Node_hub_score_centrality_plot(hub_score_centrality_all, labels_y, 3,"Hub score(in)")+theme(plot.margin = unit(c(0.0, 1, 0.0, 0.0), "cm"),axis.title.y = element_blank(),axis.text.y = element_blank())+labs(y = NULL) 
+
+# aligned_plotsin <- align_patches(p_degreein,p_hub_scorein, p_eigenin,p_pagerankin,  align = "v", axis = "tblr")
+combined_plot <- p_degreein / p_hub_scorein / p_eigenin / p_pagerankin
+# aligned_plots_COMPLINE_IN <- plot_grid(aligned_plotsin[[1]], aligned_plotsin[[2]], aligned_plotsin[[3]], aligned_plotsin[[4]], ncol = 2,labels="auto")
+# ggsave("Node_centrality_time_varying_in.pdf", aligned_plots_COMPLINE_IN, width = 14, height = 7)
+
+# la_x <- 0.06
+# aligned_plots_COMPLINE_INout <- plot_grid(aligned_plots[[1]], aligned_plots[[2]], aligned_plots[[3]], aligned_plots[[4]], aligned_plotsin[[1]], aligned_plotsin[[2]], aligned_plotsin[[3]], aligned_plotsin[[4]],labels="auto", ncol = 2,label_x = c(0,la_x,0,la_x,0,la_x,0,la_x),scale=1,rel_widths = c(1, 1))
+# aligned_plots_COMPLINE_INout
+# ggsave("FIG4_Node_centrality_time_varying_inout1.pdf", aligned_plots_COMPLINE_INout, width = 13, height = 9)
+# ggsave("Node_centrality_time_varying_inout.png", aligned_plots_COMPLINE_INout, width = 13, height = 9)
+#################################################################################################################
+
+```
+
+```{R,figure 2}
+p_degree1 <- ggdraw()+
+  draw_plot(p_eigen,x=0,y=0,width = 0.5,height = 1)+
+  draw_plot(p_eigenin,x=0.51,y=0,width = 0.44,height = 1)+
+  draw_label("c", x = 0.012, y = 0.98, size = 18, fontface = "bold") +  # Top-right of left plot
+  draw_label("d", x = 0.5, y = 0.98, size = 18, fontface = "bold")    # Top-right of right plot
+
+Figure3_eigenvector <- plot_grid(
+    plotlist = list(plot_eigenvector,p_degree1),
+    cols = 1,
+    rows = 2,
+    align = "hv",
+    labels = c(""," "),
+    label_size = 18,
+    rel_heights = c(1,0.45)
+  )
+Figure3_eigenvector
+ggsave("Figure 3.pdf", Figure3_eigenvector, width = 12.27, height = 8.17)
+#####################################################
+
+p_degree1 <- ggdraw()+
+  draw_plot(p_degree,x=0,y=0,width = 0.5,height = 1)+
+  draw_plot(p_degreein,x=0.51,y=0,width = 0.44,height = 1)
+p_degree1
+
+Figure3 <- plot_grid(
+    plotlist = list(plot_degree,p_degree1),
+    cols = 1,
+    rows = 2,
+    align = "hv",
+    labels = c("","c"),
+  label_size = 18,
+    rel_heights = c(1,0.45)
+  )
+Figure3
+ggsave("Figure S5_degree.pdf", Figure3, width = 12.27, height = 8.17)
+#####################################################
+
+
+p_degree1 <- ggdraw()+
+  draw_plot(p_hub_score,x=0,y=0,width = 0.5,height = 1)+
+  draw_plot(p_hub_scorein,x=0.51,y=0,width = 0.44,height = 1)
+
+Figure2_hub_score1 <- plot_grid(
+    plotlist = list(plot_hub_score,p_degree1),
+    cols = 1,
+    rows = 2,
+    align = "hv",
+    labels = c("","c"),
+    label_size = 18,
+    rel_heights = c(1,0.45)
+  )
+Figure2_hub_score1
+ggsave("Figure S6_hub_scorein.pdf", Figure2_hub_score1, width = 12.27, height = 8.17)
+
+#####################################################
+
+p_degree1 <- ggdraw()+
+  draw_plot(p_pagerank,x=0,y=0,width = 0.5,height = 1)+
+  draw_plot(p_pagerankin,x=0.51,y=0,width = 0.44,height = 1)
+
+
+Figure2_pagerank <- plot_grid(
+    plotlist = list(plot_pagerank,p_degree1),
+    cols = 1,
+    rows = 2,
+    align = "hv",
+    labels = c("","c"),
+    label_size = 18,
+    rel_heights = c(1,0.45)
+  )
+Figure2_pagerank
+ggsave("Figure S7_pagerank.pdf", Figure2_pagerank, width = 12.27, height = 8.17)
+
+
+
+
+
+
+#http://127.0.0.1:36417/graphics/plot_zoom_png?width=1227&height=817
+
+```
+
+
+
+
+
+```{r}
+
+# rows_to_remove <- c(2, 4, 24, 26, 27, 29, 30)
+# cols_to_remove <- c(2, 4, 24, 26, 27, 29, 30)
+# Mobility <- Mobility[,-rows_to_remove, -cols_to_remove]
+# 
+# infectionrisk <- array(0, dim = c(31, 31, num_groups, 100))
+# 
+# for(country1 in 1:31) {
+#   for(country2 in 1:31) {
+#   for (day in 1:1155) {
+#       move_infection[country2, country1, day] <- Mobility[day,country1,country2]*((1-p_report1[country2,day])*I_states[country2,day]+E_states[country2,day])
+#     }
+#   }
+# }
+# 
+# infectionrisk
+
+
+source("initial_peorid.r")
+p1 <- initial_peorid(dailyincidence, Mobility, p_report)
+p1
+# source("initial_peorid.r")
+# p4 <- initial_peorid(OLD_cases, Mobility,p_report)
+# p4
+
+source("mid_peorid.r")
+p2 <- mid_peorid(dailyincidence, Mobility,p_report)
+p2
+# source("mid_peorid.r")
+# p5 <- mid_peorid(Delta_cases, Mobility,p_report)
+# p5
+
+
+source("end_peorid.r")
+p3 <- end_peorid(dailyincidence, Mobility,p_report)
+p3
+
+# source("end_peorid.r")
+# p6 <- end_peorid(Omicron_cases, Mobility,p_report)
+# p6
+
+
+# dailyincidence
+figure5_1 <- plot_grid(
+    plotlist = list(p1, p2, p3),
+    # labels = c("a","e","i"),
+    # label_size = 18,
+    ncol = 1,
+    align = "hv",
+    rel_widths = c(1,  1, 1), # 增加 p4 的相对宽度
+    rel_heights = c(1, 1,1) # 保持相对高度不变
+  )
+figure5_1
+#ggsave("Fig7_Movement_impact_copy.pdf", figure5_1, width = 12.32, height = 10)
+# 
+# 
+# # 创建一个向量来存储每个省达到200个病例的日期
+# dates_100_cases <- rep(NA, nrow(dailyincidence))
+# # 遍历每个省
+# for (i in 1:nrow(dailyincidence)) {
+#   # 计算累计病例数
+#   cumulative_cases<- cumsum(as.numeric(dailyincidence[i,])) %>% t()
+#   # 找到累计病例数达到100的日期
+#   date_index[i] <- which(cumulative_cases >= 100)[1]
+#   if (!is.na(date_index[i])) {
+#     dates_100_cases[i] <- colnames(dailyincidence)[date_index[i]]
+#   }
+# }
+# # 将结果转换为数据框
+# result_date <- data.frame(Province = rownames(dailyincidence), Date_100_Cases = dates_100_cases)
+# cumulative_mobility <- array(0, dim = c(31, 31))
+# # 遍历每个省份和每个目标省份
+# for (i in 1:31) {
+#   for (j in 1:31) {
+#     # 计算前20天的累计数值
+#     cumulative_mobility[i,j] <- sum(Mobility[1:60,i, j])
+#   }
+# }
+# source("network_effedistance.r")
+# Deff <- network_effedistance(cumulative_mobility)
+# plot((Deff[17,]),log(date_index))# sigmoid function
+# ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# selected_elements <- c(1:16, 18:31)
+# dates_20_cases <- rep(NA, nrow(dailyincidence))
+# for (i in 1:nrow(dailyincidence)) {
+#   # 计算累计病例数
+#   dates_20_cases[i]<- sum(as.numeric(dailyincidence[i,1:60])) %>% t()
+# }
+# dates_20_cases <- data.frame(Province = rownames(dailyincidence), dates_20_cases = dates_20_cases)
+# plot((Deff[17,]),(date_index))# sigmoid function
+# plot(log(cumulative_mobility[17,selected_elements]),(dates_20_cases[selected_elements,2]))
+# plot((Deff[17,]),log(dates_20_cases[,2]))
+# 
+# source("linearfitting.r")
+# linearfitting(log(cumulative_mobility[17,selected_elements]),dates_20_cases[selected_elements,2])
+# source("linearfitting1.r")
+# linearfitting1(Deff[17,],log(dates_20_cases[,2]))
+# 
+# source("nonlinearfitting.r")
+# source("nonlinearfitting1.r")
+# nonlinearfitting((Deff[17,]),log(date_index))
+# nonlinearfitting1((Deff[17,]),log(date_index))
+
+
+source("initial_peorid1.r")
+p1s <- initial_peorid1(dailyincidence, Mobility, p_report)
+p1s
+
+source("mid_peorid1.r")
+p2s <- mid_peorid1(dailyincidence, Mobility,p_report)
+p2s
+
+
+source("end_peorid1.r")
+p3s <- end_peorid1(dailyincidence, Mobility,p_report)
+p3s
+
+figure5_1s <- plot_grid(
+    plotlist = list(p1s, p2s, p3s),
+    # labels = c("a","e","i"),
+    # label_size = 18,
+    ncol = 3,
+    align = "h",
+    rel_widths = c(1,  1, 1), # 增加 p4 的相对宽度
+    rel_heights = c(1, 1,1) # 保持相对高度不变
+  )
+figure5_1s
+
+
+ggsave("Extended Data Fig 8.pdf", figure5_1s, width = 12.86, height = 7.68)
+
+```
+
+
+
+
+
+```{R, plot clustering map,echo=F}
+source("plot_cluster_Infection_network.r")
+source("plot_cluster_spinglass_network.r")
+# GG <- G
+data_list <- lapply(1:num_groups, function(i) {
+  g <- g1[[i]]
+  #   graph_from_adjacency_matrix(
+  #   matrix(cumulative_move_infection[,,i] %>% t(), nrow = 31, byrow = TRUE), 
+  #   mode = "directed", 
+  #   weighted = TRUE
+  # )
+  V(g)$name <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 
+                 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 
+                 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 
+                 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 
+                 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+  V(g)$lon <- c(116.4142, 117.323, 114.9042, 112.2922, 113.9448, 122.6085, 126.1923, 
+                127.7615, 121.4491, 119.455, 120.0934, 117.2264, 117.9874, 115.7221, 
+                118.1498, 113.614, 112.2707, 111.7088, 113.4244, 108.7881, 109.7453, 
+                107.874, 102.7103, 106.8748, 101.487, 88.0924, 108.8701, 104.2861, 
+                95.9956, 106.1575, 85.2401)
+  V(g)$lat <- c(40.1824, 39.3054, 37.8957, 37.5777, 44.0935, 41.2956, 43.6661, 
+                47.862, 31.202, 32.9711, 29.1832, 31.8257, 26.0789, 27.614, 
+                36.3427, 33.882, 30.9756, 27.6104, 23.3417, 23.8298, 19.1959, 
+                30.0572, 30.6171, 26.8154, 24.974, 31.6927, 35.1917, 35.7518, 
+                35.7452, 37.2692, 41.1129)
+a <- as_data_frame(g, what = "edges")
+  
+edge_list <- as_data_frame(g, what = "edges") %>%
+    mutate(
+      from_lon = V(g)$lon[match(from, V(g)$name)],   
+      from_lat = V(g)$lat[match(from, V(g)$name)],   
+      to_lon = V(g)$lon[match(to, V(g)$name)],      
+      to_lat = V(g)$lat[match(to, V(g)$name)],       
+      weight = E(g)$weight
+    ) %>% 
+    transform(Month = labelsmain[i]) %>%
+    filter(from_lon != to_lon | from_lat != to_lat) %>%  # Filter out identical points
+    arrange(desc(weight)) %>%  # Sort by weight in descending order
+    slice_head(n = 100)  # Select top 100 edges
+  
+  V(g)$community <- cluster_optimal(g, weights = E(g)$weight)$membership
+  V(g)$degree <- strength(g,mode = c("out"), weights = E(g)$weight)
+  province_main_community <- data.frame(
+    name = V(g)$name, 
+    community = V(g)$community, 
+    degree = V(g)$degree, 
+    lon = V(g)$lon, 
+    lat = V(g)$lat
+  )
+  china_map <- china_map %>% 
+    full_join(province_main_community, by = "name") %>% 
+    transform(Month = labelsmain[i])
+  
+  list(nodes = china_map, edges = edge_list)
+})
+
+node_data <- do.call(rbind, lapply(data_list, `[[`, "nodes"))
+edge_data <- do.call(rbind, lapply(data_list, `[[`, "edges"))
+# edge_data <- edge_data %>% mutate(value_e = cut(weight,  breaks = c(-Inf, 5, 10, 30, 50, 80, 100, Inf),
+#                               labels = c("0-5", "5-10", "10-30", "30-50", "50-80","80-100", "100+")))
+
+edge_data <- edge_data %>% mutate(value_e = cut(weight,breaks = c(0, 2500, 10000,40000, 90000, 160000, 250000, Inf), 
+                              labels = c("0-2.5K", "2.5K-10K","10K-40K", "40K-90K", "90K-160K", "160K-250K",">250K")))
+
+# node_data <- node_data %>% mutate(value_n = cut(weight, breaks = c(-Inf, 10, 100, 300, 500, 800, 1000,1500, Inf), 
+#                               labels = c("0-10", "10-100", "100-300", "300-500", "500-800","800-1000", "1000-1500", ">1500")))
+
+node_data <- node_data %>% mutate(degree = cut(degree,breaks = c(0, 100000, 500000, 1000000, 2000000,  3000000, Inf), 
+                              labels = c("0-0.1M","0.1M-0.5M", "0.5M-1M", "1M-2M", "2M-3M",">3M")))
+# node_data <- node_data %>% filter(!is.na(value_n))
+node_data$Month <- factor(node_data$Month, levels = labelsmain)
+edge_data$Month <- factor(edge_data$Month, levels = labelsmain)
+arrow_style <- arrow(type = "closed", length = unit(0.2, "cm"), angle = 30)  # 调整箭头样式
+
+colorcom <- rainbow(4)
+plot_cluster_spinglass_1 <- ggplot() +
+    geom_sf(data = node_data, aes(fill = community), color = "black", alpha = 0.3) +  
+    scale_fill_gradientn(colours = colorcom,breaks = sort(unique(node_data$community)),labels = sort(unique(node_data$community))) +
+    geom_curve(
+        data = edge_data,
+        aes(x = from_lon, y = from_lat, xend = to_lon, yend = to_lat, color = value_e, alpha = weight),
+        curvature = 0.1, 
+        arrow = arrow(length = unit(2, 'mm'), type = "open")
+    ) + 
+    scale_alpha_continuous(range = c(0.6, 1)) +  
+    scale_color_manual(values  = c("#CDDDE5", "#A4C2D5", "#7BABCA", "#2879B0", "#2E5C8C", "red", "#CA0020")) +
+    geom_point(
+        data = node_data,
+        aes(x = lon, y = lat, size = degree, fill = community),
+        shape = 21, color = "white"
+    ) +   
+  scale_size_manual(values = c("0-0.1M" = 1.5, "0.1M-0.5M" = 2, "0.5M-1M" = 2.5, "1M-2M" = 3, "2M-3M" = 3.5, ">3M" = 4.5), na.translate = FALSE) +
+    theme_void() +
+    facet_wrap(~ Month,  nrow = 3, scales = "fixed",
+             labeller = labeller(Month = setNames(as.list(labelsmain), unique(data$Month)))) +
+    guides(
+        size = guide_legend(title = "Total\noutflow", keywidth = unit(0.01, "cm"), keyheight = unit(0.1, "cm"), order = 3, ncol = 1, override.aes = list(color = "black")),
+        alpha = "none",
+        color = guide_legend(title = "Directed\noutflow", keywidth = unit(0.01, "cm"), keyheight = unit(0.1, "cm"), order = 2, ncol = 1),
+        fill = guide_legend(title = "Cluster", keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"), order = 1, ncol = 1)
+    ) +
+    theme(strip.background = element_rect(fill = "white", color = NA),
+          strip.text.x = element_text(size = 20),
+        legend.position = c(1.07,0.21), 
+        legend.box = "vertical",
+       legend.title = element_text(size = 10),  # 调整图例标题字体大小
+       legend.text = element_text(size = 10),   # 调整图例文本字体大小
+        plot.margin = margin(-0,-3.5,-1.5,-3.5),
+        legend.spacing.x = unit(0.5, 'cm'),
+        legend.spacing.y = unit(0.5, 'cm')
+    )
+
+plot_cluster_spinglass_1
+figure5_2 <- plot_cluster_spinglass_1
+
+library(cowplot)
+
+# Step 1: Arrange plots with ggdraw()
+# combined_plot <- ggdraw() +
+#   draw_plot(
+#     figure5_2, 
+#     x = 0, y = 0, 
+#     width = 0.5, height = 1
+#   ) 
+# Step 2: Add labels at specific positions
+# Figure5_2 <- combined_plot +
+#   draw_plot_label(
+#     label = c("a", "e", "i"),
+#     x = c(0, 0, 0),  # X-coordinates (0-1 scale)
+#     y = c(1, 0.666, 0.333),       # Y-coordinates (0-1 scale)
+#     hjust = 0,            # Left alignment
+#     vjust = 1,            # Top alignment
+#     size = 18            # Font size
+#   )
+# 
+# Figure5_2
+
+
+
+
+#ggsave("Fig6_cluster_optimal_2.pdf", Figure5_2, width = 9.37, height = 7.58)
+
+figure5 <- plot_grid(
+    plotlist = list(figure5_2,NULL ,figure5_1),
+    cols = 3,
+    rows = 1,
+    align = "hv",
+    rel_widths = c(1,0.17,3)
+  )
+
+
+
+library(cowplot)
+
+# Step 1: Arrange plots with ggdraw()
+combined_plot <- ggdraw() +
+  draw_plot(
+    figure5
+  ) 
+
+# Step 2: Add labels at specific positions
+Figure5 <- combined_plot +
+  draw_plot_label(
+    label = c("a", "e", "i"),
+    x = c(0.01, 0.01, 0.01),  # X-coordinates (0-1 scale)
+    y = c(0.99, 0.66, 0.33),       # Y-coordinates (0-1 scale)
+    hjust = 0,            # Left alignment
+    vjust = 1,            # Top alignment
+    size = 20
+  )
+
+Figure5
+
+
+
+  
+  ggsave("Figure 5.pdf", Figure5, width = 19.63, height = 12.30)
+
+#http://127.0.0.1:44175/graphics/plot_zoom_png?width=1963&height=1230
+```
+
+
+
+
+
+
+
+
+
+```{R,effective number}
+library(tidyverse)
+library(ggpubr)
+library(ggplot2)
+source("get_credible_intervals_data.R")
+labels <- c("a. Jan-Feb 2020","b. Mar-Apr 2020","c. May-Jun 2020","d. Jul-Aug 2020","e. Sep-Oct 2020","f. Nov-Dec 2020",
+            "g. Jan-Feb 2021","h. Mar-Apr 2021","i. May-Jun 2021","j. Jul-Aug 2021","k. Sep-Oct 2021","l. Nov-Dec 2021",
+            "m. Jan-Feb 2022","n. Mar-Apr 2022","o. May-Jun 2022","p. Jul-Aug 2022","q. Sep-Oct 2022","r. Nov-Dec 2022","s. Jan-Feb 2023")
+months <- c("a. Jan-Feb 2020","b. Mar-Apr 2020","c. May-Jun 2020","d. Jul-Aug 2020","e. Sep-Oct 2020","f. Nov-Dec 2020",
+            "g. Jan-Feb 2021","h. Mar-Apr 2021","i. May-Jun 2021","j. Jul-Aug 2021","k. Sep-Oct 2021","l. Nov-Dec 2021",
+            "m. Jan-Feb 2022","n. Mar-Apr 2022","o. May-Jun 2022","p. Jul-Aug 2022","q. Sep-Oct 2022","r. Nov-Dec 2022","s. Jan-Feb 2023")
+
+library(dplyr)
+#result1 <- sweep(multistrain_fit$Rt1[,,seq(2, 1155)]*1, 1, 1, `*`)
+
+result1 <- tail(multistrain_fit$Rt1[,,seq(3, 1155)], 100)
+
+province <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+pred_ili_dfRt <- get_credible_intervals_data(result1,0,province)
+start_date <- as.Date("2020-01-03");end_date <- as.Date(start_date + 1152);date_range <- seq(start_date, end_date, by = "day")
+pred_ili_dfRt$Date <- rep(date_range,31)
+pred_ili_dfRt <- pred_ili_dfRt %>%rename(province = Subtype)
+# 通过创建一个新的变量将周数分组，然后对每个分组进行求和
+pred_ili_dfRt1 <- pred_ili_dfRt %>%
+  mutate(group = floor_date(Date, "2 months")) %>%
+  group_by(province, group) %>%
+  summarise(RE = mean(q50, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(group = factor(group, levels = unique(group), labels = labels))
+
+data_list <- lapply(1:length(months), function(i) {
+  province_data <- data.frame(name = province,value =pred_ili_dfRt1 %>% filter(group == labels[i]) %>% pull(RE))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+})
+
+data <- do.call(rbind, data_list)
+data$Month <- factor(data$Month, levels = months)
+plotRE2 <- ggplot(data = data) +
+    geom_sf(aes(fill = value)) +
+    scale_fill_gradient2(low = "#4A7056", mid = "white",high = "darkred",midpoint = 1.0) +
+   theme_void() +
+    facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+    labs(fill = "Re")+
+    theme(
+      legend.title = element_text(size = 10),  # 调整图例标题字体大小
+      legend.text = element_text(size = 10),   # 调整图例文本字体大小
+      plot.title = element_text(size = 10),    # 调整标题字体大小
+      legend.position = c(0.9, 0.15)
+    )
+plotRE2
+ggsave("Figure S15_plot_RE_map2.pdf", plotRE2, width = 14, height = 9)
+
+
+plotRT1 <- ggplot() +
+  geom_ribbon(data =pred_ili_dfRt,aes(x = Date,ymin = q025, ymax = q975, fill = "95% CrI"), alpha = 0.1) +
+  geom_ribbon(data =pred_ili_dfRt,aes(x = Date,ymin = q25, ymax = q75, fill = "50% CrI"), alpha = 0.2) +
+  geom_line(data =pred_ili_dfRt,aes(x = Date,y = q50, color = "Mean"),size = 0.2) +
+  facet_wrap(~ province, ncol = 8, scales = "free_y", labeller = custom_labeller) +
+  labs(x = "Time",y = "Re(t)") +
+  # scale_x_continuous(breaks = c(1, 53.25, 105.5, 165.75), labels = c("2020","2021","2022","2023"))+
+    # scale_x_continuous(breaks = seq(from = 0, to =  365.25*3+4, by = 365.25), labels = c("2020","2021","2022","2023"))+
+  theme_classic(base_size = 16) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.position = c(0.97, 0),
+    legend.justification = c(1, 0)
+    ) +scale_fill_manual(values = c("95% CrI" = "red", "50% CrI" = "red")) +
+  scale_color_manual(values = c("Mean" = "red"))+
+    guides(
+     fill = guide_legend(title = "Re"),
+     color = guide_legend(title = "Re")
+     )
+plotRT1
+ggsave("Figure S14plot_RE_time_varying.pdf", plotRT1, width = 19, height = 11)
+
+```
+
+
+
+```{R, ploting airquality index}
+# province <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+# air <- tail(multistrain_fit$air,500)
+# AirQuality <- data_lst$AirQuality 
+# start_date <- as.Date("2020-01-01");end_date <- as.Date(start_date + 1154);dates <- seq(start_date, end_date, by = "day")
+# # 设置国家代码
+# province <-province;
+# AirQuality_impact <- array(0, dim = c(500, 31, 1155))
+# for(country in 1:31) {
+#   for (day in 1:1155) {
+#     for (nums in 1:500) {
+#       AirQuality_impact[nums, country, day] <- 1/(1+exp(-air[nums]*AirQuality[day,country]))
+#     }
+#   }
+# }
+# 
+# source("calculate_RT_summary.R")
+# nums <- 1:500;
+# Air_Impact <- calculate_RT_summary(nums, province, dates, AirQuality_impact)
+# Air_Impact <- Air_Impact %>%rename(province = countries)%>%rename(Date = days)
+# 
+# 
+# Air_Impact_plot <-ggplot() +
+#   geom_ribbon(data =Air_Impact,aes(x = Date,ymin = lower_ci, ymax = upper_ci, fill = "95% CrI"), alpha = 0.2) +
+#       geom_point(data =Air_Impact,aes(x = Date,y = mean_value, color = "Mean"),size = 0.1) +
+#   # geom_line(data =Air_Impact,aes(x = Date,y = mean_value, color = "Mean"),size = 0.1, linetype = "dotted") +#
+#   facet_wrap(~ province, ncol = 8, scales = "free_y", labeller = custom_labeller) +
+#   labs(x = "Date",y = "Air quality impact") +
+#   scale_x_date(breaks = seq(as.Date("2020-01-01"), as.Date("2023-02-28"), by = "year"), labels = c("2020", "2021", "2022", "2023")) +
+#   theme_bw() + 
+#   theme(
+#     panel.grid.major = element_blank(),
+#     panel.grid.minor = element_blank(),
+#     panel.border = element_blank(),
+#     panel.background = element_blank(),
+#     axis.line = element_line(colour = "black"),
+#     plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+#     plot.subtitle = element_text(size = 12, hjust = 0.5),
+#     axis.title = element_text(size = 12),
+#     axis.text = element_text(size = 10),
+#     legend.position = c(0.97, 0.05),  
+#     legend.justification = c(1, 0)  
+#     ) +scale_fill_manual(values = c("95% CrI" = "#0072B2")) +
+#   scale_color_manual(values = c("Mean" =  "#0072B2"))+
+#     guides(
+#      fill = guide_legend(title = "Air quality impact"),
+#      color = guide_legend(title = "Air quality impact")
+#      )
+# Air_Impact_plot
+# ggsave("Figure S20_Air_Impact_plot_time_varying.pdf", Air_Impact_plot, width = 19, height = 11)
+# 
+# 
+# 
+# Air_Impact1 <- Air_Impact %>%
+#   mutate(group = floor_date(Date, "2 months")) %>%
+#   group_by(province, group) %>%
+#   summarise(sum = mean(mean_value, na.rm = TRUE)) %>%
+#   ungroup() %>%
+#   mutate(group = factor(group, levels = unique(group), labels = labels))
+# 
+# 
+# # page rank"#CDDDE5"  "#96BBD3" "#7BABCA" "#5F9AC1" "#4389B8" "#2879B0" "#2A6FA4" "#2C6598" "#2E5C8C"
+# 
+# data_list <- lapply(1:length(months), function(i) {
+#   province_data <- data.frame(name = province,value =Air_Impact1 %>% filter(group == labels[i]) %>% pull(sum))
+#   china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+# })
+#   
+# data <- do.call(rbind, data_list)
+# data <- data %>% mutate(value = cut(value, breaks = c(0,0.9,0.95,0.98,0.985,0.99,0.998,1),
+#                               labels = c("0-0.9", "0.9-0.95","0.95-0.98", "0.98-0.985", "0.985-0.99","0.99-0.998","0.998-1")))
+# plot_Air_Impact2 <- ggplot(data = data) +
+#     geom_sf(aes(fill = value)) +
+#     scale_fill_manual(values = c("gray95", "#CDDDE5","#B1CCDC" ,"#7BABCA", "#2879B0", "#FFDDC1", "#CA0020"),
+#                      
+#                       na.value = "white") +    theme_void() +
+#     facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+#     labs(fill = "AQI impact")+
+#     theme(
+#       legend.title = element_text(size = 10),  # 调整图例标题字体大小
+#       legend.text = element_text(size = 10),   # 调整图例文本字体大小
+#       plot.title = element_text(size = 10),    # 调整标题字体大小
+#       legend.position = c(0.9, 0.15)
+#     )
+# plot_Air_Impact2
+# ggsave("Figure S23_plot_Air_Impact_map_2.pdf", plot_Air_Impact2, width = 14, height = 9)
+
+
+
+
+
+
+# plot_Air_Impact <- list()
+# # 计算每bi-monthly天的累计数据 
+# source("plot_Air_impact_map.r")
+# for (i in 1:num_groups) {
+# plot_Air_Impact[[i]] <- plot_Air_impact_map(Air_Impact1 %>% filter(group == labels[i]) %>% pull(sum))
+# }
+# plot_Air_Impact2 <- plot_grid(plotlist = plot_Air_Impact, ncol = 4, labels = labels)
+# plot_Air_Impact2
+# 
+# ggsave("Figure S23_plot_Air_Impact_map_2.pdf", plot_Air_Impact2, width = 14, height = 12)
+
+```
+
+
+
+
+
+```{R, ploting temp impact}
+# Mean_Temp <- data_lst$Mean_Temp
+# temp <- tail(multistrain_fit$temp,500)
+# Mean_Temp <- data.frame(Mean_Temp)
+# start_date <- as.Date("2020-01-01");end_date <- as.Date(start_date + 1154);date_range <- seq(start_date, end_date, by = "day")
+# Mean_Temp$Date <- date_range
+# Mean_Temp_impact <- array(0, dim = c(500, 31, 1155))
+# for(country in 1:31) {
+#   for (day in 1:1155) {
+#     for (nums in 1:500) {
+#       Mean_Temp_impact[nums, country, day] <- exp(-temp[nums]*Mean_Temp[day,country])
+#     }
+#   }
+# }
+# nums <- 1:500;
+# Temp_impact <- calculate_RT_summary(nums, province, dates, Mean_Temp_impact)
+# Temp_impact <- Temp_impact %>%rename(province = countries)%>%rename(Date = days)
+# 
+# Temp_impact_plot <-ggplot() +
+#   geom_ribbon(data =Temp_impact,aes(x = Date,ymin = lower_ci, ymax = upper_ci, fill = "95% CrI"), alpha = 0.1) +
+#    geom_line(data =Temp_impact,aes(x = Date,y = mean_value, color = "Mean"),size = 0.1, linetype = "dashed") +
+#   facet_wrap(~ province, ncol = 8, scales = "free_y", labeller = custom_labeller) +
+#   labs(x = "Time",y = "Temperature Impact") +
+#   scale_x_date(breaks = seq(as.Date("2020-01-01"), as.Date("2023-02-28"), by = "year"), labels = c("2020", "2021", "2022", "2023")) +
+#   theme_bw() + 
+#   theme(
+#     panel.grid.major = element_blank(),
+#     panel.grid.minor = element_blank(),
+#     panel.border = element_blank(),
+#     panel.background = element_blank(),
+#     axis.line = element_line(colour = "black"),
+#     plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+#     plot.subtitle = element_text(size = 12, hjust = 0.5),
+#     axis.title = element_text(size = 12),
+#     axis.text = element_text(size = 10),
+#     legend.position = c(0.98, 0.05),  
+#     legend.justification = c(1, 0)  
+#     ) +scale_fill_manual(values = c("95% CrI" = "#0072B2")) +
+#   scale_color_manual(values = c("Mean" =  "#0072B2"))+
+#     guides(
+#      fill = guide_legend(title = "Temperature impact"),
+#      color = guide_legend(title = "Mean")
+#      )
+# ggsave("Figure S19_Tempimpac_plot_time_varying.pdf", Temp_impact_plot, width = 19, height = 11)
+# 
+# 
+# Temp_impact1 <- Temp_impact %>%
+#   mutate(group = floor_date(Date, "2 months")) %>%
+#   group_by(province, group) %>%
+#   summarise(sum = mean(mean_value, na.rm = TRUE)) %>%
+#   ungroup() %>%
+#   mutate(group = factor(group, levels = unique(group), labels = labels))
+# 
+# 
+# data_list <- lapply(1:length(months), function(i) {
+#   province_data <- data.frame(name = province,value =Temp_impact1 %>% filter(group == labels[i]) %>% pull(sum))
+#   china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+# })
+#   
+# data <- do.call(rbind, data_list)
+# data <- data %>% mutate(value = cut(value, breaks = c(0,0.95,0.96,0.97,0.98,0.99,1,1.02,Inf),
+#                               labels = c("<0.95", "0.95-0.96","0.96-0.97", "0.97-0.98", "0.98-0.99","0.99-1.0","1.0-1.02",">1.02")))
+# plot_Temp_impact2 <- ggplot(data = data) +
+#     geom_sf(aes(fill = value)) +
+#     scale_fill_manual(values = c("gray95", "#CDDDE5","#B1CCDC","#96BBD3","#7BABCA", "#2879B0", "#FFDDC1", "#CA0020"), na.value = "white") +   
+#   theme_void() +
+#     facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+#     labs(fill = "Temperature impact")+
+#     theme(
+#       legend.title = element_text(size = 10),  # 调整图例标题字体大小
+#       legend.text = element_text(size = 10),   # 调整图例文本字体大小
+#       plot.title = element_text(size = 10),    # 调整标题字体大小
+#       legend.position = c(0.9, 0.15)
+#     )
+# plot_Temp_impact2
+# ggsave("Figure S22_plot_Temp_impact_map2.pdf", plot_Temp_impact2, width = 14, height = 9)
+
+# "#CDDDE5" "#B1CCDC"  "#7BABCA" "#5F9AC1" "#4389B8" "#2879B0" "#2A6FA4" "#2C6598" "#2E5C8C"
+
+# plot_Temp_impact <- list()
+# source("plot_Temperature_impact_map.r")
+# for (i in 1:num_groups) {
+# plot_Temp_impact[[i]] <- plot_Temperature_impact_map(Temp_impact1 %>% filter(group == labels[i]) %>% pull(sum))
+# }
+# plot_Temp_impact2 <- plot_grid(plotlist = plot_Temp_impact, ncol = 4, labels = labels)
+# ggsave("Figure S22_plot_Temp_impact_map2.pdf", plot_Temp_impact2, width = 14, height = 12)
+
+```
+
+```{R, ploting NPI}
+source("calculate_RT_summary.r")
+province <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+countries <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+
+start_date <- as.Date("2020-01-01");end_date <- as.Date(start_date + 1154);dates <- seq(start_date, end_date, by = "day")
+province <- c(
+  'Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 
+  'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 
+  'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 
+  'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 
+  'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang'
+)
+npi <- tail(multistrain_fit$npi,500)
+NPI <- data_lst$NPI1/100
+NPI_impact1 <- array(0, dim = c(500, 31, 1155))
+for(country in 1:31) {
+  for (day in 1:1155) {
+    for (nums in 1:500) {
+      NPI_impact1[nums, country, day] <- exp(-npi[nums]*NPI[country,day])
+    }
+  }
+}
+nums <- 1:500;
+
+ NPI_impact <- calculate_RT_summary(nums, province, dates, NPI_impact1)
+ NPI_impact <- NPI_impact %>%rename(province = province)%>%rename(Date = days)
+
+  
+NPI_impact_plot <-ggplot() +
+  geom_ribbon(data =NPI_impact,aes(x = Date,ymin = lower_ci, ymax = upper_ci, fill = "95% CrI"), alpha = 0.1) +
+  geom_line(data =NPI_impact,aes(x = Date,y = mean_value, color = "Mean"),size = 0.3, linetype = "dashed") +
+  facet_wrap(~ province, ncol = 8, scales = "free_y", labeller = custom_labeller) +
+  labs(x = "Time",y = expression(atop("NPI impact",beta["NPI"]))) +
+  scale_x_date(breaks = seq(as.Date("2020-01-01"), as.Date("2023-02-28"), by = "year"), labels = c("2020", "2021", "2022", "2023")) +
+  theme_bw() + 
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.position = c(0.97, 0.05), 
+    plot.margin = margin(10,10,10,10,"mm"),
+    legend.justification = c(1, 0)  
+    ) +scale_fill_manual(values = c("95% CrI" = "red")) +
+  scale_color_manual(values = c("Mean" =  "red"))+
+    guides(
+     fill = guide_legend(title = NULL),
+     color = guide_legend(title =expression(atop("NPI impact", beta["NPI"])))
+     )
+ggsave("Extended Data Fig 9.pdf", NPI_impact_plot, width = 19, height = 11)
+
+
+
+NPI_impact1 <- NPI_impact %>%
+  mutate(group = floor_date(Date, "2 months")) %>%
+  group_by(province, group) %>%
+  summarise(sum = mean(mean_value, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(group = factor(group, levels = unique(group), labels = labels))
+
+data_list <- lapply(1:length(months), function(i) {
+  province_data <- data.frame(name = province,value =NPI_impact1 %>% filter(group == labels[i]) %>% pull(sum))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+})
+  
+data <- do.call(rbind, data_list)
+
+plot_NPI_impact2 <- ggplot(data = data) +
+    geom_sf(aes(fill = value)) +
+    scale_fill_gradient2(low = "#4A7056", mid = "white",high = "#976666",midpoint = median(data$value, na.rm = TRUE)) +
+  theme_void() +
+    facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+    labs(fill = expression(atop("NPI impact", beta["NPI"])))+
+    theme(
+      legend.title = element_text(size = 10),  # 调整图例标题字体大小
+      legend.text = element_text(size = 10),   # 调整图例文本字体大小
+      plot.title = element_text(size = 10),    # 调整标题字体大小
+      legend.position = c(0.9, 0.15)
+    )
+plot_NPI_impact2
+ggsave("Extended Data Fig 10.pdf", plot_NPI_impact2, width = 14, height = 9)
+
+
+
+# plot_NPI_impact <- list()
+# source("plot_NPI_impact_map.r")
+# for (i in 1:num_groups) {
+# plot_NPI_impact[[i]] <- plot_NPI_impact_map(NPI_impact1 %>% filter(group == labels[i]) %>% pull(sum))
+# }
+# plot_NPI_impact2 <- plot_grid(plotlist = plot_NPI_impact, ncol = 4, labels = labels)
+# ggsave("Figure S21_plot_NPI_impact_map2.pdf", plot_NPI_impact2, width = 14, height = 12)
+
+```
+
+
+
+
+```{R, ploting ascertainment rate}
+library(tidyverse)
+library(ggpubr)
+library(ggplot2)
+thetap <- multistrain_fit$thetap # size 300*31
+rate <- multistrain_fit$rate#[,1]  size 300*1
+ap2 <- multistrain_fit$rate # [,1]size 300*1
+ap3 <- multistrain_fit$rate #[,1] size 300*1
+p_report <- array(0, dim = c(100, 31, 1155))
+for(province in 1:31) { 
+  for (nums in 1:100) {
+  for (day in 1:51) {
+      p_report[nums,province,day] = thetap[nums]*(exp(rate[nums]*NPI[province,day]))}
+   for (day in 52:1072) { 
+      p_report[nums,province,day] = thetap[nums]*(exp(ap2[nums]*NPI[province,day]))}
+    for (day in 1073:1155) { 
+      p_report[nums,province,day] = thetap[nums]*(exp(ap3[nums]*NPI[province,day]))}
+  }
+}
+col_names <- c(
+  'Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 
+  'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 
+  'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 
+  'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 
+  'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang'
+)
+start_date <- as.Date("2020-01-01");end_date <- as.Date(start_date + 1154);dates <- seq(start_date, end_date, by = "day")
+# 设置国家代码
+province <-col_names;nums <- 1:100;
+# 使用expand.grid()创建数据框
+setwd("E:\\Dong\\one_drive\\OneDrive - The University Of Hong Kong\\_HMRF_2021_HIGHER_ORDER_MODEL")
+
+source("calculate_RT_summary.R")
+p_report1 <- calculate_RT_summary(nums, province, dates, p_report)
+p_report1 <- p_report1 %>%rename(province = province)%>%rename(Date = days)
+RT1_plot <-ggplot() +
+  geom_ribbon(data =p_report1,aes(x = Date,ymin = lower_ci, ymax = upper_ci, fill = "95% CrI"), alpha = 0.1) +
+  geom_line(data =p_report1,aes(x = Date,y = mean_value, color = "Mean"),size = 0.3, linetype = "dashed") +
+  facet_wrap(~ province, ncol = 8, scales = "free_y", labeller = custom_labeller) +
+  labs(x = "Time",y = "NPI Impact") +
+  scale_x_date(breaks = seq(as.Date("2020-01-01"), as.Date("2023-02-28"), by = "year"), labels = c("2020", "2021", "2022", "2023")) +
+  theme_bw() + 
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.position = c(0.97, 0.05),  
+    legend.justification = c(1, 0)  
+    ) +scale_fill_manual(values = c("95% CrI" = "red", "50% CrI" = "red")) +
+  scale_color_manual(values = c("Mean" = "red"))+
+    guides(
+    fill = guide_legend(title = "Ascertainment rates"),
+    color = guide_legend(title = "Ascertainment rates")
+     )
+ggsave("Figure S16_p_report_plot_time_varying.pdf", RT1_plot, width = 14, height = 9)
+
+
+
+p_report1 <- p_report1 %>%
+  mutate(group = floor_date(Date, "2 months")) %>%
+  group_by(province, group) %>%
+  summarise(sum = mean(mean_value, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(group = factor(group, levels = unique(group), labels = labels))
+
+data_list <- lapply(1:length(months), function(i) {
+  province_data <- data.frame(name = province,value =p_report1 %>% filter(group == labels[i]) %>% pull(sum))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+})
+  
+data <- do.call(rbind, data_list)
+# data <- data %>% mutate(value = cut(value, breaks = c(0,0.4,0.45,0.50,0.55,0.60,0.65,Inf),
+#                               labels = c("<0.4", "0.4-0.45","0.45-0.50", "0.50-0.55","0.55-0.60","0.60-0.65", ">0.65")))
+p_report_plot2 <- ggplot(data = data) +
+    geom_sf(aes(fill = value)) +
+    scale_fill_gradient2(low = "#4A7056", mid = "white",high = "#976666",midpoint = 0.006) +#
+  theme_void() +
+    facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+    labs(fill = "Ascertainment rates")+
+    theme(
+      legend.title = element_text(size = 10),  # 调整图例标题字体大小
+      legend.text = element_text(size = 10),   # 调整图例文本字体大小
+      plot.title = element_text(size = 10),    # 调整标题字体大小
+      legend.position = c(0.9, 0.15)
+    )
+p_report_plot2
+ggsave("Figure S17plot_p_report_map_2.pdf", p_report_plot2, width = 14, height = 9)
+
+
+# p_report_plot <- list()
+# source("plot_p_report_map.r")
+# for (i in 1:num_groups) {
+# p_report_plot[[i]] <- plot_p_report_map(p_report1 %>% filter(group == labels[i]) %>% pull(sum))
+# }
+# p_report_plot2 <- plot_grid(plotlist = p_report_plot, ncol = 4, labels = labels)
+# ggsave("Figure S27plot_p_report_map_2.pdf", p_report_plot2, width = 14, height = 12)
+# 
+
+
+
+```
+
+
+
+
+
+```{R}
+library(tidyverse)
+library(ggpubr)
+library(ggplot2)
+#load("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/model_str_multi_AH_T_H_All/model_str_multi_T_H_All_NB.Rdata")
+source("get_credible_intervals_data.r")
+source("get_credible_intervals_data_whole.r")
+row_names <-c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+# pred_ili_df_S1 <- get_credible_intervals_data(multistrain_fit$E_2,skip+365.25*5,row_names)
+# pred_ili_df_V1 <- get_credible_intervals_data(multistrain_fit$V_2,skip+365.25*5,row_names)
+# pred_ili_df_R1 <- get_credible_intervals_data(multistrain_fit$I_2,skip+365.25*5,row_names)
+pred_ili_dfS <- get_credible_intervals_data(multistrain_fit$S,0,row_names)
+# pred_ili_dfV <- get_credible_intervals_data(multistrain_fit$V,0+365.25*0,row_names)
+pred_ili_dfR <- get_credible_intervals_data(multistrain_fit$R,0+365.25*0,row_names)
+# pred_ili_dftheap <- get_credible_intervals_data(multistrain_fit$thetap,0+365.25*0,row_names)
+
+# pred_ili_dfE <- get_credible_intervals_data(multistrain_fit$E,0+365.25*0,row_names)
+# pred_ili_dfI <- get_credible_intervals_data(multistrain_fit$I,0+365.25*0,row_names)
+#######################################################################################################################
+# pred_ili_dfBeta_KT <- get_credible_intervals_data(multistrain_fit$Rt,skip+365.25*0,row_names)
+# plotRt <- list()
+# for(i in 1:K) {
+# plotRt[[i]] <- ggplot() + geom_ribbon(data = pred_ili_dfBeta_KT %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q025, ymax = q975, fill = "Rt"), alpha = 0.2, show.legend = TRUE) +
+#   geom_ribbon(data = pred_ili_dfBeta_KT %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q25, ymax = q75, fill = "Rt"), alpha = 0.2, show.legend = FALSE) +
+#   geom_line(data = pred_ili_dfBeta_KT %>% filter(Subtype == row_names[i]), aes(x = week + 0, y = q50, colour = "Rt"), show.legend = TRUE) +
+#   ylim(0,3)
+# }
+# plotRt_combined_plot1 <- ggarrange(plotlist = plotRt, ncol = 2, nrow = 2, align = "hv", common.legend = FALSE)
+##########################################################################################################################
+plot_list1 <- list()
+for(i in 1:K) {
+  plot_list1[[i]] <- ggplot() +  geom_ribbon(data = pred_ili_dfS %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q025, ymax = q975, fill = "S"), alpha = 0.2, show.legend = TRUE) +
+  geom_ribbon(data = pred_ili_dfS %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q25, ymax = q75, fill = "S"), alpha = 0.2, show.legend = FALSE) +
+  geom_line(data = pred_ili_dfS %>% filter(Subtype == row_names[i]), aes(x = week + 0, y = q50, colour = "S"), show.legend = TRUE) +
+  # geom_ribbon(data = pred_ili_dfV %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q025, ymax = q975, fill = "V"), alpha = 0.2, show.legend = TRUE) +
+  # geom_ribbon(data = pred_ili_dfV %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q25, ymax = q75, fill = "V"), alpha = 0.2, show.legend = FALSE) +
+  # geom_line(data = pred_ili_dfV %>% filter(Subtype == row_names[i]), aes(x = week + 0, y = q50, colour = "V"), show.legend = TRUE) +
+  geom_ribbon(data = pred_ili_dfR %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q025, ymax = q975, fill = "R"), alpha = 0.2, show.legend = TRUE) +
+  geom_ribbon(data = pred_ili_dfR %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q25, ymax = q75, fill = "R"), alpha = 0.2, show.legend = FALSE) +
+  geom_line(data = pred_ili_dfR %>% filter(Subtype == row_names[i]), aes(x = week + 0, y = q50, colour = "R"), show.legend = TRUE) +
+  # geom_ribbon(data = pred_ili_dfE %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q025, ymax = q975, fill = "E"), alpha = 0.2, show.legend = TRUE) +
+  # geom_ribbon(data = pred_ili_dfE %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q25, ymax = q75, fill = "E"), alpha = 0.2, show.legend = FALSE) +
+  # geom_line(data = pred_ili_dfE %>% filter(Subtype == row_names[i]), aes(x = week + 0, y = q50, colour = "E"), show.legend = TRUE) +
+  # geom_ribbon(data = pred_ili_dfI %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q025, ymax = q975, fill = "I"), alpha = 0.2, show.legend = TRUE) +
+  # geom_ribbon(data = pred_ili_dfI %>% filter(Subtype == row_names[i]), aes(x = week + 0, ymin = q25, ymax = q75, fill = "I"), alpha = 0.2, show.legend = FALSE) +
+  # geom_line(data = pred_ili_dfI %>% filter(Subtype == row_names[i]), aes(x = week + 0, y = q50, colour = "I"), show.legend = TRUE) +
+  theme(legend.position = c(0.9, 0.77),legend.key = element_blank(),legend.background = element_blank(),legend.box.background = element_blank(),text = element_text(size = 12))+
+    scale_x_continuous(breaks = seq(from = 0, to =  365.25*3+1, by = 365.25), labels = c("2020","2021","2022","2023"))+
+    facet_wrap(~ Variable, ncol = 6, scales = "free_y", labeller = custom_labeller) +
+    ylab("Proportion") + xlab("Year") +
+    scale_fill_manual(name = row_names[i], values = c("S" = "red","V" = "blue","R" = "green","E" = "purple","I" = "grey" )) + #"S1" = "gray","V1" = "gray","R1" = "gray"
+    scale_color_manual(name =  row_names[i], values = c( "S" = "red","V" = "blue","R" = "green","E" = "purple","I" = "grey"))
+}
+combined_plot1 <- ggarrange(plotlist = plot_list1, ncol = 6, nrow = 6, align = "hv", common.legend = FALSE)
+# Combine the legends
+combined_plotRSV <- combined_plot1 + theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Legend Title"), colour = guide_legend(title = NULL))
+#ggsave(filename = "subtype_AH_T1.pdf", plot = combined_plot1, width =29, height = 15)
+# Display the combined plot
+print(combined_plotRSV)
+combined_plotRSV
+``` 
+
+
+
+
+
+```{r plotResults, dependson = c("load_results", "load_data"), fig.cap = "Model fit to the data. Top panel has the fit to the ILI consultation data (blue). Furthermore, the panel highlights the causes of ILI, i.e. by each influenza strain or other non-flu causes. The bottom panel has the fit to the virological confirmation data.", echo = T}
+# Plotting the fits
+# ILI data
+source('F:\\Dong\\SPH Dropbox\\Wang Dong\\model_str_multi_AH_T_H_All\\plot_expanded_draws.R')
+library(bayesplot)
+library(posterior)
+library(magrittr)
+library(dplyr)
+library(purrr)
+library(forcats)
+library(tidyr)
+library(modelr)
+library(ggdist)
+library(tidybayes)
+library(ggplot2)
+library(cowplot)
+library(rstan)
+library(RColorBrewer)
+
+###############################################################################################
+# plot_expanded_draws(stan_fit %>% tidybayes::gather_draws(a0[1]),"a0")
+# plot_expanded_draws(stan_fit %>% tidybayes::gather_draws(a1[1]),"a1")
+# plot_expanded_draws(stan_fit %>% tidybayes::gather_draws(a2[1]),"a2")
+# plot_expanded_draws(stan_fit %>% tidybayes::gather_draws(b1[1]),"b1")
+# plot_expanded_draws(stan_fit %>% tidybayes::gather_draws(d1[1]),"d1")
+# plot_expanded_draws(stan_fit %>% tidybayes::gather_draws(npi[1]),"npi")
+
+```
+
+
+
+
+
+```{r plotResults, dependson = c("load_results", "load_data"), fig.cap = "Model fit to the data. Top panel has the fit to the ILI consultation data (blue). Furthermore, the panel highlights the causes of ILI, i.e. by each influenza strain or other non-flu causes. The bottom panel has the fit to the virological confirmation data.", echo = T}
+# # ILI data
+# ili_df <- data_lst$cases %>% as_data_frame() %>%dplyr::mutate(value = H1)%>% mutate(week = row_number()) %>%
+#   ungroup()
+# thetap_df <- multistrain_fit$thetap %>% as.data.frame.table() %>%
+# rename(np = iterations, thetap = Freq) %>%
+#   dplyr::mutate(np = as.numeric(np))
+# 
+# # Then plot draws/tot (with uncertainty) by strain and also plot data with pos/tot
+# df <- multistrain_fit$PILI %>% as.data.frame.table() %>%
+#   rename(np = iterations, week = Var3, Subtype = Var2, value = Freq) %>%
+#   dplyr::mutate(
+#     np = as.numeric(np),
+#     week = as.numeric(week),
+#     Subtype = factor(Subtype, labels = c("H1"))
+#   )
+# #rbinom #pred = rnorm(n(), as.matrix(round(N*(multistrain_fit$PILI)))*as.vector(multistrain_fit$thetap),8)
+# pred_ili_df <- df %>% mutate( pred = rbinom(n(), round(N*(multistrain_fit$PILI)),(multistrain_fit$thetap))) %>% mutate(value = pred)
+# pred_ili_df <- pred_ili_df %>% group_by(np, week) %>%
+#   bind_rows(pred_ili_df) %>% group_by(Subtype,week) %>%
+#   summarise(
+#     q025 = quantile(value, 0.025),
+#     q25 = quantile(value, 0.25),
+#     q50 = quantile(value, 0.5),
+#     q75 = quantile(value, 0.75),
+#     q975 = quantile(value, 0.975)
+#   ) %>% ungroup() %>% dplyr::mutate(Subtype = factor(Subtype, levels = c("H1", "H2"))) 
+# 
+# library(openxlsx)
+# wb <- createWorkbook()
+# for (i in 1:K) {
+#   # 提取每个表格的数据
+#   start_row <- (i - 1) * Nweek + 1
+#   end_row <- i * Nweek
+#   sub_data <- pred_ili_df[start_row:end_row, ]
+#   # 将数据添加到Excel工作簿的新Sheet中
+#   sheet_name <- paste("Sheet", i, sep = "")
+#   addWorksheet(wb, sheet_name)
+#   writeData(wb, sheet_name, sub_data)
+# }
+# saveWorkbook(wb, "pred_ili_df.xlsx", overwrite = TRUE)
+# 
+# full_names <- countrycode(sourcevar = row_names, origin = "iso2c", destination = "country.name")
+# plot_list <- list()
+# for(i in 1:K) {
+#   plot_list[[i]] <- ggplot() +
+#     geom_point(data = ili_df, aes(x = skip + week, y = !!sym(row_names[i]))) +
+#     geom_ribbon(data = pred_ili_df %>% filter(Subtype == row_names[i]), aes(x = week, ymin = q025, ymax = q975, fill = "Prediction"), alpha = 0.3, show.legend = TRUE) +
+#     geom_ribbon(data = pred_ili_df %>% filter(Subtype == row_names[i]), aes(x = week, ymin = q25, ymax = q75, fill = "Prediction"), alpha = 0.3, show.legend = FALSE) +
+#     geom_line(data = pred_ili_df %>% filter(Subtype == row_names[i]), aes(x = week, y = q50, colour = "Prediction"), show.legend = TRUE) +
+#     geom_ribbon(data = pred_ili_df_cf %>% filter(Subtype == row_names[i]), aes(x = week + 210.5, ymin = q025cf, ymax = q975cf, fill = "Forecasting"), alpha = 0.3, show.legend = TRUE) +
+#     geom_ribbon(data = pred_ili_df_cf %>% filter(Subtype == row_names[i]), aes(x = week + 210.5, ymin = q25cf, ymax = q75cf, fill = "Forecasting"), alpha = 0.3, show.legend = FALSE) +
+#     geom_line(data = pred_ili_df_cf %>% filter(Subtype == row_names[i]), aes(x = week + 210.5, y = q50cf, colour = "Forecasting"), show.legend = TRUE) +
+#     theme(legend.position = c(0.9, 0.77),legend.key = element_blank(),legend.background = element_blank(),legend.box.background = element_blank(),text = element_text(size = 12))+
+#     scale_x_continuous(breaks = c(312, 364.25, 416.5, 468.75, 521, 573.25), labels = c( "2016", "2017", "2018", "2019", "2020","2021"))+
+#     ylab("ILI+ proxy/10000") + xlab("Year") +
+#     scale_fill_manual(name = full_names[i], values = c("Forecasting" = "blue","Prediction" = "red" )) +
+#     scale_color_manual(name =  full_names[i], values = c( "Forecasting" = "blue","Prediction" = "red"))
+# }
+# combined_plot <- ggarrange(plotlist = plot_list, ncol = 3, nrow = 6, align = "hv", common.legend = FALSE)
+# # Combine the legends
+# combined_plot <- combined_plot + theme(legend.position = "bottom") +
+#   guides(fill = guide_legend(title = "Legend Title"), colour = guide_legend(title = NULL))
+# ggsave(filename = "Mobility_contact_Base.pdf", plot = combined_plot, width =29, height = 15)
+# # Display the combined plot
+# print(combined_plot)
+# 
+# ```
+# # save data
+# 
+# ```{r load_data, echo = T}
+# subtypes <- c("H1")
+# skip <- 0
+# row_names <- c("H1", "H2")
+# df <- read.csv("assets/multistrain.csv",skip = skip, nrows = 707-skip, col.names = row_names)# WEEKLU
+# NPI <- read.csv("assets/NPI.csv",skip = skip*7,nrows =6000-skip*7)# DAILY
+# K=1;
+# N = 1000000;
+# Nweek <- nrow(df);
+# vc <- numeric(5809)
+# Vacc_Sea <- c(seq(45*7,57*7), seq(97*7,109*7), seq(144*7,156*7), seq(197*7,209*7), seq(254*7,266*7), seq(306*7,318*7), seq(357*7,369*7), seq(408*7,420*7), seq(459*7,471*7), seq(511*7,523*7), seq(564*7,576*7),seq(617*7,628*7),seq(669*7,680*7),seq(721*7,732*7),seq(773*7,787*7))
+# for (day in 1:5809){
+# if (day %in% Vacc_Sea) {
+#     vc[day] <- 0.13/91
+# }
+# }
+# vc <-  vc[(skip*7+1):5809]
+# data_lst <- list(
+#   SKIP = skip,
+#   K = K, 
+#   T = nrow(df)*7 + 1,
+#   W = nrow(df),
+#   N = N,
+#   cases = df %>% dplyr::select(H1) %>%  +10^(-18) %>% as.matrix(),   #round() %>% 
+#   vc = vc %>% as.array(),
+#   NPI = NPI %>% as.matrix()
+# )
+# ```
+# 
+# ```{R}
+# # install.packages(c("igraph", "ggplot2", "ggraph", "maps", "dplyr"))
+# # g <- graph_from_adjacency_matrix(matrix(sum_move_infection1%>% t(), nrow=31, byrow=TRUE), mode="directed", weighted=TRUE)
+# library(igraph)
+# library(ggplot2)
+# library(ggraph)
+# library(maps)
+# library(dplyr)
+
+#
+# set.seed(123)
+# V(g)$lon <- c(116.4142,117.323,114.9042,112.2922,113.9448,122.6085,126.1923,127.7615,121.4491,119.455,120.0934,117.2264,117.9874,115.7221,118.1498,113.614,112.2707,	111.7088,113.4244,108.7881,109.7453,107.874,102.7103,106.8748,101.487,88.0924,108.8701,104.2861,95.9956,106.1575,85.2401)
+# V(g)$lat <- c(40.1824,39.3054,37.8957,37.5777,44.0935,41.2956,43.6661,47.862,31.202,32.9711,29.1832,31.8257,26.0789,27.614,36.3427,33.882,30.9756,27.6104,23.3417,23.8298,19.1959,30.0572,30.6171,26.8154,24.974,31.6927,35.1917,35.7518,35.7452,37.2692,41.1129)
+# layout_matrix <- cbind(V(g)$lon, V(g)$lat)
+# V(g)$weight <- data_lst$cases[5,]
+# E(g)$eweight <- runif(ecount(g), 0.001, 0.005)
+# V(g)$province <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+# library(rnaturalearth)
+# library(rnaturalearthdata)
+# china_province_map_data <- ne_states(country = "China", returnclass = "sf")
+# taiwan_map_data <- ne_province(country = "taiwan")
+# common_columns <- intersect(colnames(china_province_map_data), colnames(taiwan_map_data))
+# china_province_map_data <- china_province_map_data[, common_columns]
+# taiwan_map_data <- taiwan_map_data[, common_columns]
+# merged_map_data <- rbind(china_province_map_data, taiwan_map_data)
+# # 使用Walktrap算法
+# communities <- cluster_walktrap(g,weights = E(g)$weight,modularity = TRUE) #, modularity = 4
+# # # 或者使用Spinglass算法
+# # communities <- cluster_spinglass(g, spins = 25)
+# V(g)$community <- communities$membership
+# # 为每个省分配一个主社区（最多的节点数）
+# province_communities <- data.frame(
+#   province = V(g)$province,
+#   community = V(g)$community)
+# # V(g)$group <- paste(V(g)$community, V(g)$province, sep = "_")
+# # # 根据group分配颜色
+# # group_colors <- rainbow(length(unique(V(g)$group)))
+# # names(group_colors) <- unique(V(g)$group)
+# # V(g)$color <- group_colors[V(g)$group]
+# # 统计每个省中社区的数量，并选择数量最多的社区作为主社区
+# province_main_community <- aggregate(community ~ province, data = province_communities,
+#                                      FUN = function(x) as.numeric(names(sort(table(x), decreasing = TRUE)[1])))
+# # 将省的社区信息加入到地图数据中
+# merged_map_data$community <- province_main_community$community[match(merged_map_data$name, province_main_community$province)]
+# # 为每个社区分配颜色
+# community_colors <- rainbow(length(unique(merged_map_data$community)))
+# names(community_colors) <- unique(merged_map_data$community)
+# 绘图
+# plot_combined <- ggraph(g, layout = layout_matrix) +
+#   # 根据社区信息填充省份颜色
+#   geom_sf(data = merged_map_data, aes(fill = as.factor(community)), color = "black", alpha = 0.3) +
+#   scale_fill_manual(values = community_colors, name = "Communities") +
+#   # 绘制网络的边，并添加箭头，使用 eweight 调整边的透明度和颜色
+#   geom_edge_link(aes(width = eweight, alpha = eweight, color = eweight), arrow = arrow(length = unit(3, 'mm'), type = "open")) +
+#   # 使用为社区分配的颜色绘制节点，并隐藏 color 图例
+#   geom_node_point(aes(size = weight, color = as.factor(community))) +
+#   # 调整图例和主题
+#   scale_size_continuous(name = "Infection No") +
+#   scale_edge_color_gradient(name = "Infection Move", low = "lightblue", high = "darkblue") +  # Adjust edge color gradient
+#     scale_edge_width_continuous(name = "Link Weights", range = c(0.0001, 0.2)) +
+#   scale_edge_alpha_continuous(name = "Link Transparency", range = c(0.0001, 0.2)) +  # Adjust transparency scaling
+#   theme_void() +
+#   guides(
+#     fill = guide_legend(title = "Communities"),
+#     size = guide_legend(title = "Infection No."),
+#     edge_width ="none",
+#     edge_alpha ="none",
+#     color = "none"  # 隐藏 color 图例
+#   )
+# # 显示图形
+# ggsave("plot_combined.pdf", plot_combined, width = 18, height = 12)
+# plot_combined
+# plot1 <- plot(communities, g)
+# plot2 <-ggraph(g, layout = layout_matrix) +
+#   # 绘制中国省级地图
+#   geom_sf(data = merged_map_data, fill = "white", color = "black", alpha = 0.3) +
+#   # 绘制网络的边，并添加箭头
+#   geom_edge_link(aes(width =  eweight), color = "blue", alpha = 0.4,
+#                  arrow = arrow(length = unit(3, 'mm'), type = "open")) +
+#   # geom_edge_arc(aes(width = 0.01 * eweight), color = "blue", alpha = 0.6,
+#   #                arrow = arrow(length = unit(3, 'mm'), type = "open")) +
+#   # 绘制网络的节点
+#   geom_node_point(aes(size = weight), color = "red") +
+#   # 调整图例和主题
+#   scale_size_continuous(name = "Node Weights") +
+#   scale_edge_width_continuous(name = "Link Weights", range = c(0.000, 1)) +
+#   theme_void()
+# # 假设你有一个带有地理信息的节点数据框
+# nodes_data <- data.frame(
+#   id = V(g)$name,
+#   community = membership(community),  # 社区划分信息
+#   latitude = c(40.1824,39.3054,39.549,37.5777,44.0935,41.2956,43.6661,47.862,31.202,32.9711,29.1832,31.8257,26.0789,27.614,36.3427,37.8957,30.9756,27.6104,23.3417,23.8298,19.1959,30.0572,30.6171,26.8154,24.974,31.6927,35.1917,35.7518,35.7452,37.2692,41.1129),  # 示例经度
+#   longitude = c(116.4142,117.323,116.1306,112.2922,113.9448,122.6085,126.1923,127.7615,121.4491,119.455,120.0934,117.2264,117.9874,115.7221,118.1498,114.9042,112.2707,	111.7088,113.4244,108.7881,109.7453,107.874,102.7103,106.8748,101.487,88.0924,108.8701,104.2861,95.9956,106.1575,85.2401)  # 示例纬度
+# )
+# 
+# # 合并社区信息到节点数据
+# nodes_data <- nodes_data %>%
+#   mutate(community = factor(community))  # 转换为因子，以便后续映射颜色
+```
+
+
+```{R}
+source("get_credible_intervals_data.r")
+source("get_credible_intervals_data_whole.r")
+row_names <-c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+# pred_ili_df_S1 <- get_credible_intervals_data(multistrain_fit$E_2,skip+365.25*5,row_names)
+# pred_ili_df_V1 <- get_credible_intervals_data(multistrain_fit$V_2,skip+365.25*5,row_names)
+# pred_ili_df_R1 <- get_credible_intervals_data(multistrain_fit$I_2,skip+365.25*5,row_names)
+pred_ili_dfS <- get_credible_intervals_data(multistrain_fit$S,0+365.25*0,row_names)
+# pred_ili_dfV <- get_credible_intervals_data(multistrain_fit$V,0+365.25*0,row_names)
+pred_ili_dfR <- get_credible_intervals_data(multistrain_fit$R,0+365.25*0,row_names)
+#save(list = ls(), file = "model_str_multi_AH_T_H_All_NB.Rdata")
+```
+
+```{R}
+library(tidyverse)
+library(ggpubr)
+library(ggplot2)
+#load("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/model_str_multi_AH_T_H_All/model_str_multi_T_H_All_NB.Rdata")
+
+plot2 <- ggplot() +
+  geom_ribbon(data =pred_ili_dfS,aes(x = week,ymin = q025, ymax = q975), alpha = 0.1, fill = "red") +
+  geom_ribbon(data =pred_ili_dfS,aes(x = week,ymin = q25, ymax = q75), alpha = 0.2, fill = "red") +
+  geom_line(data =pred_ili_dfS,aes(x = week,y = q50), color = "red") +
+  geom_ribbon(data =pred_ili_dfR,aes(x = week,ymin = q025, ymax = q975), alpha = 0.1, fill = "green") +
+  geom_ribbon(data =pred_ili_dfR,aes(x = week,ymin = q25, ymax = q75), alpha = 0.2, fill = "green") +
+  geom_line(data =pred_ili_dfR,aes(x = week,y = q50), color = "green") +
+  facet_wrap(~ Subtype, ncol = 6, scales = "free_y", labeller = custom_labeller) +
+  labs(
+    x = "Time",
+    y = "Proportion"
+  ) +
+    scale_x_continuous(breaks = seq(from = 0, to =  365.25*3+1, by = 365.25), labels = c("2020","2021","2022","2023"))+
+  theme_bw() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.position = "bottom"
+  )
+# Display the plot
+plot2
+```
+
+
+
+Fitting the model (note this will take some time):
+```{r}
+setwd("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL")
+# m <- stan_model('model_str_multi_AH_T_all_no_cos')
+# setwd("D:\\OneDrive - The University Of Hong Kong\\_HMRF_2021_HIGHER_ORDER_MODEL")
+load("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL/standard_model_mainland7_1002.Rdata")
+
+# warnings('off')
+m <- stan_model('higher_order_model_10.stan')
+
+K=31;error <- 10^(-18)
+N = c(21893095,13866009,74610235,34915616,24049155,42591407,24073453,31850088,24870895,84748016,
+64567588,61027171,41540086,45188635,101527453,99365519,57752557,66444864,126012510,50126804,10081232,32054159,83674866,38562148,47209277,3648100,39528999,25019831,5923957,7202654,25852345);
+
+X <-  seq(from=1, to=1156, by=1);num_knots  <-  10; spline_degree <- 3;
+a_raw <-  matrix(apply(multistrain_fit$a_raw, c(2,3), function(x) quantile(x, probs = 0.4)), ncol = num_knots + spline_degree - 1, nrow  = K)
+
+apply(multistrain_fit$a_raw, 2, function(x) quantile(x, probs = 0.4))
+
+data_lst <- list(
+  K = K, 
+  T = nrow(weeklydata)*7,
+  W = nrow(weeklydata),
+  N = N,
+  cases = weeklydata %>% as.matrix(), 
+  NPI1 = NPI%>% as.matrix(),
+  Mean_Temp = Mean_Temp  %>% as.matrix(),
+  AirQuality= AirQuality %>% as.matrix(),
+  C= C,
+  nl=nl[,1],
+  part=part[,1],
+  phi0 = 10,
+  error = error,
+  num_data = nrow(weeklydata)*7 + 1,
+  num_knots = num_knots,
+  knots = unname(quantile(X,probs=seq(from=0, to=1, length.out = num_knots))),
+  spline_degree = spline_degree,
+  X = X,
+  a_raw1=a_raw
+)
+
+num_chains <- 1
+init_lst <- purrr::map(1:num_chains, function(i) {
+  list(
+    thetap =apply(multistrain_fit$thetap%>%t(),1,  median)%>% as.array(),
+    S0 =  runif(K,0.98,0.99),
+    E0 =  apply(multistrain_fit$E0, 2, median),
+    I0 =  apply(multistrain_fit$I0, 2, median),
+    air =  apply(multistrain_fit$air%>%t(),1,  median),
+    temp =apply(multistrain_fit$temp%>%t(),1,  median), 
+    npi = apply(multistrain_fit$npi%>%t(),1, median),
+    phi = 5,
+    v=runif(1,0.7,0.8),
+    a_raw = matrix(apply(multistrain_fit$a_raw, c(2,3),  mean), ncol = num_knots + spline_degree - 1, nrow  = K), 
+  rate=runif(1,0.006774,0.007774)%>% as.array(),
+p=runif(1,0.65,0.657),
+sp=runif(1,4.7,5)
+  )})
+
+parameters_stoch = c("Rt1","p","sp","p_report","pred_cases","phi","a_raw","v","thetap","S0","E0","I0","npi","air","temp","S","R","I","E","beta","rate")
+
+stan_fit <- rstan::sampling(
+  m, 
+  data = data_lst, 
+  pars = parameters_stoch,
+  chains = num_chains, 
+  iter = 100,  
+  thin = 1, 
+  cores = num_chains, 
+  verbose = TRUE,
+  show_messages = TRUE,
+  seed = sample.int(.Machine$integer.max, 1),
+  init = init_lst
+)
+
+```
+
+```{R}
+setwd("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL")
+source("get_credible_intervals_data.r")
+source("get_credible_intervals_data_whole.r")
+provincenames <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+load("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL/standard_model_mainland102_final.Rdata")
+source("calculate_wis.r")
+source("caluate_difference_between_obs_pre.r")
+source("calculate_loglik.r")
+wis_std <- calculate_wis(multistrain_fit,data_lst)
+wis_std  %>% unlist() %>% sum()
+# [1] 3021.756
+source("caluate_difference_between_obs_pre.r")
+error_std <- caluate_difference_between_obs_pre(data_lst$cases,multistrain_fit)
+error_std
+# [1] 8315.281 304.0086
+loglik_std <- calculate_loglik(multistrain_fit)
+loglik_std %>% unlist() %>% mean()
+# [1] -3.09
+
+load("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL/Higer_order4.Rdata")
+setwd("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL")
+source("calculate_wis.r")
+source("caluate_difference_between_obs_pre.r")
+source("calculate_loglik.r")
+wis_high <- calculate_wis(multistrain_fit,data_lst)
+wis_high %>% unlist() %>% sum()
+# [1] 3092
+error_high <- caluate_difference_between_obs_pre(data_lst$cases,multistrain_fit)
+error_high
+# [1] 8451 311
+loglik_high <- calculate_loglik(multistrain_fit)
+loglik_high %>% unlist() %>% mean()
+# [1] 3.08
+
+
+load("/home/Dong/Higher_model_mainland/higher_0/Higer_order_012.Rdata")
+A1 <- tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+load("/home/Dong/Higher_model_mainland/higher_1/Higer_order_13_final.Rdata")
+A2 <-tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+load("/home/Dong/Higher_model_mainland/Higher_13/Higer_order_13_final.Rdata")
+A3 <-tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+load("/home/Dong/Higher_model_mainland/Higher_13_3/Higer_mainland_133.Rdata")
+A4 <-tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+load("/home/Dong/Higher_model_mainland/higher_2/Higer222.Rdata")
+A5 <-tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+load("/home/Dong/Higher_model_mainland/higher_3/Higer_order312.Rdata")
+A6 <-tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+load("/home/Dong/Higher_model_mainland/higher_4/Higer_order4.Rdata")
+A7 <-tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+load("/home/Dong/Higher_model_mainland/Higher_6/Higer_order6.Rdata")
+A8 <-tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+load("/home/Dong/Higher_model_mainland/standard_0/standard_model_mainland102_final.Rdata")
+A9 <-tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+load("/home/Dong/Higher_model_mainland/standard_10_1/standard_model_012.Rdata")
+A10 = -2.7326
+load("/home/Dong/Higher_model_mainland/standard_10_3/standard_model_1015.Rdata")
+A11 <-tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000) %>% mean()
+
+#apply(tail(multistrain_fit$log_lik[,seq(1:31),seq(1:165)], 1000),c(2),mean)
+
+save(A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,file = "LOGLIKE.Rdata")
+
+
+
+```
+
+```{R,data ploting,for VOCs, echo = TRUE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(RColorBrewer)
+setwd("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL")
+provincenames <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+dailyincidence <- readMat("case/dailyincidence.mat")
+# 将数据转换为数据框
+# 创建时间序列1
+start_date <- as.Date("2020-01-01")
+end_date <- as.Date("2023-02-28")
+date_range <- seq(start_date, end_date, by = "day")
+dailyincidence <- as.data.frame(dailyincidence)
+dailyincidence <- dailyincidence %>% mutate(across(everything(), ~ ifelse(. < 0, 0, .)))
+colnames(dailyincidence) <- date_range
+rownames(dailyincidence) <- provincenames 
+# 将数据转换为数据框
+dailyincidence <- as.data.frame(dailyincidence) %>% t()
+colnames(dailyincidence) <- provincenames 
+
+
+dailyincidence <- dailyincidence%>% as.data.frame()  %>% dplyr::select(Beijing, Hebei, Inner, Liaoning, Jilin, Heilongjiang, Shanghai, Jiangsu, Zhejiang, Anhui, Fujian, Jiangxi, Shandong, Henan, Hubei, Hunan, Guangdong, Guangxi, Chongqing, Sichuan, Yunnan,Shaanxi, Gansu, Xinjiang) %>% t()
+
+# dailyincidence[2:nrow(dailyincidence), 2:ncol(dailyincidence)] <- lapply(dailyincidence[2:nrow(dailyincidence), 2:ncol(dailyincidence)], as.numeric)
+
+
+
+
+start_date <- as.Date("2020-01-01");end_date <- as.Date(start_date + 1154);date_range <- seq(start_date, end_date, by = "day")
+OLD_cases  <-  read.csv("Clade/OLD_df.csv")  %>% dplyr::select(Beijing, Hebei, InnerMongol, Liaoning, Jilin, Heilongjiang, Shanghai, Jiangsu, Zhejiang, Anhui, Fujian, Jiangxi, Shandong, Henan, Hubei, Hunan, Guangdong, Guangxi, Chongqing, Sichuan, Yunnan,Shaanxi, Gansu, Xinjiang) %>% t()*dailyincidence
+
+colnames(OLD_cases) <- date_range
+
+Delta_cases  <-  read.csv("Clade/Delta_df.csv")  %>% dplyr::select(Beijing, Hebei, InnerMongol, Liaoning, Jilin, Heilongjiang, Shanghai, Jiangsu, Zhejiang, Anhui, Fujian, Jiangxi, Shandong, Henan, Hubei, Hunan, Guangdong, Guangxi, Chongqing, Sichuan, Yunnan,Shaanxi, Gansu, Xinjiang) %>% t()*dailyincidence
+colnames(Delta_cases) <- date_range
+Omicron_cases  <-  read.csv("Clade/Omicron_df.csv")  %>% dplyr::select(Beijing, Hebei, InnerMongol, Liaoning, Jilin, Heilongjiang, Shanghai, Jiangsu, Zhejiang, Anhui, Fujian, Jiangxi, Shandong, Henan, Hubei, Hunan, Guangdong, Guangxi, Chongqing, Sichuan, Yunnan,Shaanxi, Gansu, Xinjiang) %>% t()*dailyincidence 
+colnames(Omicron_cases) <- date_range
+
+Omicron_cases_df <- Omicron_cases %>% as.data.frame() %>% rownames_to_column(var = "Date") %>%replace_na(list(Date = "0"))
+
+df_long <- reshape2::melt(Omicron_cases_df, id.vars = "Date", variable.name = "Province", value.name = "Cases")
+colnames(df_long) <- c("Province","Date","Cases")
+# 绘制数据
+num_provinces <- length(unique(df_long$Province))
+
+# 创建一个彩虹色的调色板
+color_palette <- rainbow(num_provinces)
+ggplot(df_long, aes(x = as.numeric(Date), y = Cases, color = Province, group = Province)) +
+    geom_line() +
+    scale_color_manual(values = color_palette) +
+    labs(title = "Omicron Cases Over Time by Province", x = "Date", y = "Number of Cases") +
+    scale_x_continuous(breaks = seq(1, max(as.numeric(df_long$Date)), by = 365), labels = function(x) as.Date(x, origin = "2020-01-01")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    theme_minimal()
+
+
+source("plot_VOC_cases.R")
+plot_VOC_cases("Clade/Omicron_df.csv",dailyincidence)
+plot_VOC_cases("Clade/Delta_df.csv",dailyincidence)
+plot_VOC_cases("Clade/OLD_df.csv",dailyincidence)
+``` 
+
+
+```{r,echo=FALSE}
+load("credible_intervals_std.RData")
+# load("E:/Dong/one_drive/OneDrive - The University Of Hong Kong/_HMRF_2021_HIGHER_ORDER_MODEL/Higer_order_modelfinal_13.Rdata")
+pred_cases_hig <- tail(multistrain_fit$pred_cases[,seq(1:31),seq(1:165)], 1000)
+# Reshape the data
+data_frame_hig <- reshape2::melt(sqrt(1+pred_cases_hig))
+colnames(data_frame_hig) <- c("Iteration", "Variable", "Length", "Value")
+# Calculate credible intervals
+credible_intervals_hig <- data_frame_hig %>%
+  group_by(Variable, Length) %>%
+  summarize(
+    lower = quantile(Value, 0.025),
+    upper = quantile(Value, 0.975),
+    lower1 = quantile(Value, 0.25),
+    upper1 = quantile(Value, 0.75),
+    mean = mean(Value)#quantile(Value, 0.5)
+  ) %>%
+  mutate(Variable = factor(Variable))
+save(credible_intervals_hig, file = "credible_intervals_hig.RData")
+
+# Prepare ILI data
+data_ILI <- sqrt(1+data_lst$cases) %>% tibble::as_data_frame() %>% mutate(week = row_number())
+colnames(data_ILI) <- seq_len(ncol(data_ILI))
+data_ILI$id <- seq_len(nrow(data_ILI))
+# data_ILI$Variable <- seq_len(nrow(data_ILI))
+
+data_ILI_long <- reshape2::melt(data_ILI, id.vars = "id")
+colnames(data_ILI_long) <- c("Length", "Variable", "Value")
+
+# Combine credible intervals and ILI data
+credible_intervals_hig <- credible_intervals_hig %>%
+  left_join(data_ILI_long, by = c("Variable", "Length"))
+
+custom_labeller <- function(variable, value) {
+  return(c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongolia', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang'))
+}
+plot1 <- ggplot() +
+  geom_point(data = credible_intervals_hig, aes(x = Length, y = Value, alpha = "Data", show.legend = "TRUE"), size = 0.3) + 
+  geom_ribbon(data = credible_intervals_std, aes(x = Length, ymin = lower, ymax = upper, fill = "Fitting_std"), alpha = 0.15) +
+  geom_ribbon(data = credible_intervals_std, aes(x = Length, ymin = lower1, ymax = upper1, fill = "Fitting_std"), alpha = 0.3) +
+  geom_line(data = credible_intervals_std, aes(x = Length, y = mean, color = "Fitting_std")) +  # 共享 color 图例
+  geom_ribbon(data = credible_intervals_hig, aes(x = Length, ymin = lower, ymax = upper, fill = "Fitting_hig"), alpha = 0.15) +
+  geom_ribbon(data = credible_intervals_hig, aes(x = Length, ymin = lower1, ymax = upper1, fill = "Fitting_hig"), alpha = 0.3) +
+  geom_line(data = credible_intervals_hig, aes(x = Length, y = mean, color = "Fitting_hig")) +  # 共享 color 图例
+  theme_default() +
+  theme(
+    axis.text.y = element_text(size = 20),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_line(color = "black"),
+    axis.title.y = element_text(size = 20),
+    axis.title.x = element_text(size = 20),
+    axis.line = element_line(color = "black"),
+    legend.position = c(0.97, 0.075),
+    legend.justification = c(1, 0),
+    strip.text = element_text(size = 16, hjust = 0.5, vjust = -0.5),
+    strip.placement = "inside",
+    legend.spacing = unit(0.0, "cm"),  # 调整图例项之间的水平间距
+    legend.spacing.y = unit(-0.5, "cm")  # 调整图例项之间的垂直间距
+  ) +
+  facet_wrap(~ Variable, ncol = 8, scales = "free", labeller = custom_labeller) +#, strip.position = "top"
+  labs(
+    x = "Time",
+    y = expression(sqrt(Incidences))
+  ) +
+  scale_x_continuous(breaks = c(1, 53.25, 105.5, 165.75), labels = c("2020", "2021", "2022", "2023")) +
+  scale_alpha_manual(
+    name = "",  # 设置共享图例名称
+    values = c("Data" = 255)
+  ) +  
+  scale_fill_manual(
+    name = "",  # 设置共享图例名称
+    values = c("Fitting_std" = "blue","Fitting_hig" =  "#F8766D")
+  
+  ) +
+  scale_color_manual(
+    name = "",  # 设置共享图例名称
+    values = c("Fitting_std" = "blue","Fitting_hig" =  "#F8766D")
+  ) +
+  guides(
+    alpha = guide_legend(theme = theme(legend.text = element_text(size = 18)),order = 1, override.aes = list(fill = "black", color = "black")),
+    fill = guide_legend(theme = theme(legend.text = element_text(size = 18)),order = 2),
+    color = guide_legend(theme = theme(legend.text = element_text(size = 18)),order = 2)
+  )
+
+plot1
+
+ggsave("Fig3_social_impact_fitting2_std_hig.pdf", plot1, width = 19, height = 11)
+```
+
+
+```{r}
+
+# rows_to_remove <- c(2, 4, 24, 26, 27, 29, 30)
+# cols_to_remove <- c(2, 4, 24, 26, 27, 29, 30)
+# Mobility <- Mobility[,-rows_to_remove, -cols_to_remove]
+# 
+
+source("initial_peorid.r")
+p1 <- initial_peorid(dailyincidence, Mobility,p_report)
+p1
+# source("initial_peorid.r")
+# p4 <- initial_peorid(OLD_cases, Mobility,p_report)
+# p4
+
+source("mid_peorid.r")
+p2 <- mid_peorid(dailyincidence, Mobility,p_report)
+p2
+# source("mid_peorid.r")
+# p5 <- mid_peorid(Delta_cases, Mobility,p_report)
+# p5
+
+
+source("end_peorid.r")
+p3 <- end_peorid(dailyincidence, Mobility,p_report)
+p3
+# source("end_peorid.r")
+# p6 <- end_peorid(Omicron_cases, Mobility,p_report)
+# p6
+
+
+# dailyincidence
+figure5_1 <- plot_grid(
+    plotlist = list(p1, p2, p3),
+    labels = NULL,
+    ncol = 1,
+    align = "hv",
+    rel_widths = c(1,  1, 1), # 增加 p4 的相对宽度
+    rel_heights = c(1, 1,1) # 保持相对高度不变
+  )
+figure5_1
+#ggsave("Fig7_Movement_impact_copy.pdf", figure5_1, width = 12.32, height = 10)
+# 
+# 
+# # 创建一个向量来存储每个省达到200个病例的日期
+# dates_100_cases <- rep(NA, nrow(dailyincidence))
+# # 遍历每个省
+# for (i in 1:nrow(dailyincidence)) {
+#   # 计算累计病例数
+#   cumulative_cases<- cumsum(as.numeric(dailyincidence[i,])) %>% t()
+#   # 找到累计病例数达到100的日期
+#   date_index[i] <- which(cumulative_cases >= 100)[1]
+#   if (!is.na(date_index[i])) {
+#     dates_100_cases[i] <- colnames(dailyincidence)[date_index[i]]
+#   }
+# }
+# # 将结果转换为数据框
+# result_date <- data.frame(Province = rownames(dailyincidence), Date_100_Cases = dates_100_cases)
+# cumulative_mobility <- array(0, dim = c(31, 31))
+# # 遍历每个省份和每个目标省份
+# for (i in 1:31) {
+#   for (j in 1:31) {
+#     # 计算前20天的累计数值
+#     cumulative_mobility[i,j] <- sum(Mobility[1:60,i, j])
+#   }
+# }
+# source("network_effedistance.r")
+# Deff <- network_effedistance(cumulative_mobility)
+# plot((Deff[17,]),log(date_index))# sigmoid function
+# ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# selected_elements <- c(1:16, 18:31)
+# dates_20_cases <- rep(NA, nrow(dailyincidence))
+# for (i in 1:nrow(dailyincidence)) {
+#   # 计算累计病例数
+#   dates_20_cases[i]<- sum(as.numeric(dailyincidence[i,1:60])) %>% t()
+# }
+# dates_20_cases <- data.frame(Province = rownames(dailyincidence), dates_20_cases = dates_20_cases)
+# plot((Deff[17,]),(date_index))# sigmoid function
+# plot(log(cumulative_mobility[17,selected_elements]),(dates_20_cases[selected_elements,2]))
+# plot((Deff[17,]),log(dates_20_cases[,2]))
+# 
+# source("linearfitting.r")
+# linearfitting(log(cumulative_mobility[17,selected_elements]),dates_20_cases[selected_elements,2])
+# source("linearfitting1.r")
+# linearfitting1(Deff[17,],log(dates_20_cases[,2]))
+# 
+# source("nonlinearfitting.r")
+# source("nonlinearfitting1.r")
+# nonlinearfitting((Deff[17,]),log(date_index))
+# nonlinearfitting1((Deff[17,]),log(date_index))
+
+```
+
+```{R}
+result1 <- sweep(multistrain_fit$Rt1[,,seq(2, 1155)]*1, 1, multistrain_fit$p, `*`)
+result2 <- sweep(multistrain_fit$Rt1[,,seq(2, 1155)]*1, 1, (1-multistrain_fit$p)*multistrain_fit$sp, `*`)
+
+province <- c('Beijing', 'Tianjin', 'Hebei', 'Shanxi', 'Inner Mongol', 'Liaoning', 'Jilin', 'Heilongjiang', 'Shanghai', 'Jiangsu', 'Zhejiang', 'Anhui', 'Fujian', 'Jiangxi', 'Shandong', 'Henan', 'Hubei', 'Hunan', 'Guangdong', 'Guangxi', 'Hainan', 'Chongqing', 'Sichuan', 'Guizhou', 'Yunnan', 'Xizang', 'Shaanxi', 'Gansu', 'Qinghai', 'Ningxia', 'Xinjiang')
+pred_ili_dfRt <- get_credible_intervals_data(result1+result2,0,province)%>% select(-week)
+start_date <- as.Date("2020-01-02");end_date <- as.Date(start_date + 1153);date_range <- seq(start_date, end_date, by = "day")
+pred_ili_dfRt$Date <- rep(date_range,31)
+pred_ili_dfRt <- pred_ili_dfRt %>%rename(province = Subtype)
+# 通过创建一个新的变量将周数分组，然后对每个分组进行求和
+pred_ili_dfRt1 <- pred_ili_dfRt %>%
+  mutate(group = floor_date(Date, "2 months")) %>%
+  group_by(province, group) %>%
+  summarise(RE = mean(q50, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(group = factor(group, levels = unique(group), labels = labels))
+# source("plot_RE_map.R")
+# plotRE <- list()
+# pred_ili_dfRt_month <- array(0, dim = c(19, 31))
+# num_groups <- 19
+# for (i in 1:num_groups) {
+# plotRE[[i]] <- plot_RE_map(pred_ili_dfRt1 %>% filter(group == labels[i]) %>% pull(RE))
+# }
+# plotRE2 <- plot_grid(plotlist = plotRE, ncol = 4,labels = labels)
+# ggsave("Figure S25_plot_RE_map2.pdf", plotRE2, width = 14, height = 12)
+# page rank
+data_list <- lapply(1:length(months), function(i) {
+  province_data <- data.frame(name = province,value =pred_ili_dfRt1 %>% filter(group == months[i]) %>% pull(RE))
+  china_map <- china_map %>%full_join(province_data, by = "name") %>% transform(Month = months[i])
+})
+
+data <- do.call(rbind, data_list)
+data$Month <- factor(data$Month, levels = labelsmain)
+# data <- data %>% mutate(value = cut(value, breaks = c(0,0.2,0.6,1,1.4,1.8,2,Inf),
+#                               labels = c("0-0.2", "0.2-0.6","0.6-1", "1-1.4","1.4-1.8","1.8-2", ">2")))
+plotRE2 <- ggplot(data = data) +
+    geom_sf(aes(fill = value)) +
+    scale_fill_gradient2(low = "#4A7056", mid = "white",high = "darkred",midpoint = 1.0) +
+   theme_void() +
+    facet_wrap(~ Month, ncol = 5, nrow = 4, scales = "fixed") +
+    labs(fill = "Re")+
+    theme(
+      legend.title = element_text(size = 10),  # 调整图例标题字体大小
+      legend.text = element_text(size = 10),   # 调整图例文本字体大小
+      plot.title = element_text(size = 10),    # 调整标题字体大小
+      legend.position = c(0.9, 0.15)
+    )
+plotRE2
+ggsave("Figure S25_plot_RE_map2.pdf", plotRE2, width = 14, height = 9)
+# 
+# plotRT1 <- ggplot() +
+#   geom_ribbon(data =pred_ili_dfRt,aes(x = Date,ymin = q025, ymax = q975, fill = "95% CrI"), alpha = 0.1) +
+#   geom_ribbon(data =pred_ili_dfRt,aes(x = Date,ymin = q25, ymax = q75, fill = "50% CrI"), alpha = 0.2) +
+#   geom_line(data =pred_ili_dfRt,aes(x = Date,y = q50, color = "Mean"),size = 0.2) +
+#   facet_wrap(~ province, ncol = 8, scales = "fixed", labeller = custom_labeller) +
+#   labs(x = "Time",y = "Re") +
+#   # scale_x_continuous(breaks = c(1, 53.25, 105.5, 165.75), labels = c("2020","2021","2022","2023"))+
+#     # scale_x_continuous(breaks = seq(from = 0, to =  365.25*3+4, by = 365.25), labels = c("2020","2021","2022","2023"))+
+#   theme_bw() + 
+#   theme(
+#     panel.grid.major = element_blank(),
+#     panel.grid.minor = element_blank(),
+#     panel.border = element_blank(),
+#     panel.background = element_blank(),
+#     axis.line = element_line(colour = "black"),
+#     plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+#     plot.subtitle = element_text(size = 12, hjust = 0.5),
+#     axis.title = element_text(size = 12),
+#     axis.text = element_text(size = 10),
+#     legend.position = c(0.97, 0),  
+#     legend.justification = c(1, 0)  
+#     ) +scale_fill_manual(values = c("95% CrI" = "red", "50% CrI" = "red")) +
+#   scale_color_manual(values = c("Mean" = "red"))#+
+#     # guides(
+#     #  fill = guide_legend(title = "Re"),
+#     #  color = guide_legend(title = "Re")
+#     #  )
+# plotRT1
+# ggsave("Figure S24plot_RE_time_varying.pdf", plotRT1, width = 19, height = 11)
+
+```
+
+library(openxlsx)
+wb <- createWorkbook()
+for (i in 1:K) {
+  # 提取每个表格的数据
+  start_row <- (i - 1) * Nweek + 1
+  end_row <- i * Nweek
+  sub_data <- PILI[start_row:end_row, ]
+  # 将数据添加到Excel工作簿的新Sheet中
+  sheet_name <- paste("Sheet", i, sep = "")
+  addWorksheet(wb, sheet_name)
+  writeData(wb, sheet_name, sub_data)
+}
+saveWorkbook(wb, "outputlogn.xlsx", overwrite = TRUE)
